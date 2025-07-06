@@ -2,11 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Save, X, Calendar, DollarSign, User, Trash2 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
+const DEFAULT_INTEREST = 0.2;
+const DEFAULT_PENALTY = 0.05;
+
 const LoanTracker = () => {
   const [loans, setLoans] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingLoan, setEditingLoan] = useState(null);
   const [selectedLoan, setSelectedLoan] = useState(null);
+  const [editRateLoan, setEditRateLoan] = useState(null);
+  const [rateForm, setRateForm] = useState({ interestRate: '', penaltyRate: '' });
   
   const [newLoan, setNewLoan] = useState({
     borrowerName: '',
@@ -52,6 +57,10 @@ const LoanTracker = () => {
     // Process payments chronologically
     const sortedPayments = [...payments].sort((a, b) => new Date(a.date) - new Date(b.date));
     
+    // ใช้อัตราดอกเบี้ย/ค่าปรับจาก loan ถ้ามี ถ้าไม่มีใช้ default
+    const interestRate = loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST;
+    const penaltyRate = loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY;
+    
     for (const payment of sortedPayments) {
       totalPaid += payment.amount;
       const paymentDate = new Date(payment.date);
@@ -62,7 +71,7 @@ const LoanTracker = () => {
       paymentWeekStart.setDate(paymentWeekStart.getDate() + (weeksSinceStart * 7));
       
       // Calculate weekly interest for this period
-      const weeklyInterest = currentPrincipal * 0.2;
+      const weeklyInterest = currentPrincipal * interestRate;
       
       // If this is the current week, track interest payments
       const currentWeekNumber = Math.floor((today - startDate) / (1000 * 60 * 60 * 24 * 7));
@@ -107,7 +116,7 @@ const LoanTracker = () => {
     nextPaymentDue.setDate(nextPaymentDue.getDate() + 7);
     
     // Calculate current interest and penalties
-    const weeklyInterest = currentPrincipal * 0.2;
+    const weeklyInterest = currentPrincipal * interestRate;
     const interestDue = Math.max(0, weeklyInterest - interestPaidThisWeek);
     
     const daysSinceWeekStart = Math.floor((today - currentWeekStartDate) / (1000 * 60 * 60 * 24));
@@ -116,7 +125,7 @@ const LoanTracker = () => {
     let penalty = 0;
     if (isOverdue) {
       const daysOverdue = Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
-      penalty = currentPrincipal * 0.05 * daysOverdue;
+      penalty = currentPrincipal * penaltyRate * daysOverdue;
     }
     
     return {
@@ -130,7 +139,9 @@ const LoanTracker = () => {
       nextPaymentDue,
       isOverdue,
       daysOverdue: isOverdue ? Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24)) : 0,
-      lastInterestPaymentDate
+      lastInterestPaymentDate,
+      interestRate,
+      penaltyRate
     };
   };
 
@@ -144,6 +155,8 @@ const LoanTracker = () => {
         startDate: newLoan.startDate,
         phone: newLoan.phone,
         payments: [],
+        interestRate: DEFAULT_INTEREST,
+        penaltyRate: DEFAULT_PENALTY,
       }
     ]).select();
     if (error) {
@@ -185,6 +198,22 @@ const LoanTracker = () => {
         setLoans(loans.filter(loan => loan.id !== loanId));
         setSelectedLoan(null);
       }
+    }
+  };
+
+  // อัปเดตอัตราดอกเบี้ย/ค่าปรับ
+  const saveRate = async () => {
+    if (!editRateLoan) return;
+    const { error } = await supabase.from('loans').update({
+      interestRate: rateForm.interestRate === '' ? null : parseFloat(rateForm.interestRate),
+      penaltyRate: rateForm.penaltyRate === '' ? null : parseFloat(rateForm.penaltyRate),
+    }).eq('id', editRateLoan.id);
+    if (error) {
+      alert('บันทึกอัตราดอกเบี้ยผิดพลาด: ' + error.message);
+    } else {
+      setEditRateLoan(null);
+      setRateForm({ interestRate: '', penaltyRate: '' });
+      refreshLoans();
     }
   };
 
@@ -304,7 +333,23 @@ const LoanTracker = () => {
                     status.isOverdue ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-blue-300'
                   }`}
                   onClick={() => setSelectedLoan(loan)}
+                  style={{ position: 'relative' }}
                 >
+                  {/* ปุ่มแก้ไขอัตรา */}
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      setEditRateLoan(loan);
+                      setRateForm({
+                        interestRate: loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST,
+                        penaltyRate: loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY,
+                      });
+                    }}
+                    className="absolute right-2 top-2 bg-yellow-200 hover:bg-yellow-300 text-yellow-800 rounded px-2 py-1 text-xs font-bold shadow"
+                    title="แก้ไขอัตราดอกเบี้ย/ค่าปรับ"
+                  >
+                    <Edit2 size={14} className="inline mr-1" /> แก้ไขอัตรา
+                  </button>
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-2">
                       <User className="text-blue-600" size={20} />
@@ -335,6 +380,14 @@ const LoanTracker = () => {
                       <span className="font-bold text-blue-600">{formatCurrency(status.totalDue)}</span>
                     </div>
                     <div className="flex justify-between">
+                      <span className="text-gray-600">ดอกเบี้ย/สัปดาห์:</span>
+                      <span className="font-medium">{(status.interestRate * 100).toFixed(2)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">ค่าปรับ/วัน:</span>
+                      <span className="font-medium">{(status.penaltyRate * 100).toFixed(2)}%</span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-gray-600">ครบกำหนด:</span>
                       <span className="font-medium text-purple-600">{formatDate(status.nextPaymentDue.toISOString().split('T')[0])}</span>
                     </div>
@@ -358,6 +411,56 @@ const LoanTracker = () => {
             </div>
           )}
         </div>
+
+        {/* Modal แก้ไขอัตราดอกเบี้ย/ค่าปรับ */}
+        {editRateLoan && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">แก้ไขอัตราดอกเบี้ย/ค่าปรับ</h2>
+                <button onClick={() => setEditRateLoan(null)} className="text-gray-400 hover:text-gray-600">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">อัตราดอกเบี้ย (เช่น 0.2 = 20%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={rateForm.interestRate}
+                    onChange={e => setRateForm({ ...rateForm, interestRate: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">อัตราค่าปรับ (เช่น 0.05 = 5%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={rateForm.penaltyRate}
+                    onChange={e => setRateForm({ ...rateForm, penaltyRate: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={saveRate}
+                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    บันทึก
+                  </button>
+                  <button
+                    onClick={() => setEditRateLoan(null)}
+                    className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Loan Details Modal */}
         {selectedLoan && (

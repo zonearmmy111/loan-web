@@ -229,6 +229,21 @@ const LoanTracker = () => {
     return new Date(dateStr).toLocaleDateString('th-TH');
   };
 
+  // เพิ่มฟังก์ชันช่วยแสดงข้อความครบกำหนด
+  const getDueText = (dueDate) => {
+    const today = new Date();
+    const due = new Date(dueDate);
+    // set time to 0 for compare only date
+    today.setHours(0,0,0,0);
+    due.setHours(0,0,0,0);
+    const diffDays = Math.floor((due - today) / (1000 * 60 * 60 * 24));
+    if (diffDays === 1) return { text: 'พรุ่งนี้', color: 'text-orange-500' };
+    if (diffDays === 0) return { text: 'วันนี้', color: 'text-green-600 font-bold' };
+    if (diffDays < 0) return { text: 'เกินกำหนดชำระ', color: 'text-red-600 font-bold' };
+    // แสดงวันที่ปกติ
+    return { text: formatDate(dueDate), color: 'text-purple-600' };
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-7xl mx-auto">
@@ -365,19 +380,19 @@ const LoanTracker = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">เงินต้นคงเหลือ:</span>
-                      <span className="font-medium">{formatCurrency(status.currentPrincipal)}</span>
+                      <span className="font-medium text-blue-900">{formatCurrency(status.currentPrincipal)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">ดอกเบี้ยค้างชำระ:</span>
-                      <span className="font-medium text-orange-600">{formatCurrency(status.interestDue)}</span>
+                      <span className="font-medium text-orange-500">{formatCurrency(status.interestDue)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">ค่าปรับ:</span>
-                      <span className="font-medium text-red-600">{formatCurrency(status.penalty)}</span>
+                      <span className="font-medium text-red-500">{formatCurrency(status.penalty)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">ต้องจ่าย:</span>
-                      <span className="font-bold text-blue-600">{formatCurrency(status.totalDue)}</span>
+                      <span className="font-extrabold text-pink-600 text-lg drop-shadow">{formatCurrency(status.totalDue)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">ดอกเบี้ย/สัปดาห์:</span>
@@ -389,7 +404,10 @@ const LoanTracker = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">ครบกำหนด:</span>
-                      <span className="font-medium text-purple-600">{formatDate(status.nextPaymentDue.toISOString().split('T')[0])}</span>
+                      {(() => {
+                        const due = getDueText(status.nextPaymentDue.toISOString().split('T')[0]);
+                        return <span className={`font-bold ${due.color}`}>{due.text}</span>;
+                      })()}
                     </div>
                     {loan.phone && (
                       <div className="flex justify-between">

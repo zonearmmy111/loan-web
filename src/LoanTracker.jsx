@@ -309,13 +309,13 @@ const LoanTracker = () => {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">เบอร์โทรศัพท์</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">ช่องทางการติดต่อ</label>
                     <input
-                      type="tel"
+                      type="text"
                       value={newLoan.phone}
                       onChange={(e) => setNewLoan({ ...newLoan, phone: e.target.value })}
                       className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="0xx-xxx-xxxx"
+                      placeholder="ระบุช่องทางการติดต่อ เช่น เบอร์โทร ไลน์ เฟซบุ๊ก ฯลฯ"
                     />
                   </div>
                   
@@ -440,7 +440,7 @@ const LoanTracker = () => {
                     )}
                     {loan.phone && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">เบอร์โทร:</span>
+                        <span className="text-gray-600">ช่องทางการติดต่อ:</span>
                         <span className="font-medium">{loan.phone}</span>
                       </div>
                     )}

@@ -17,7 +17,8 @@ const LoanTracker = () => {
     borrowerName: '',
     principal: '',
     startDate: new Date().toISOString().split('T')[0],
-    phone: ''
+    phone: '',
+    note: ''
   });
 
   const [payment, setPayment] = useState({
@@ -154,6 +155,7 @@ const LoanTracker = () => {
         principal: parseFloat(newLoan.principal),
         startDate: newLoan.startDate,
         phone: newLoan.phone,
+        note: newLoan.note,
         payments: [],
         interestRate: DEFAULT_INTEREST,
         penaltyRate: DEFAULT_PENALTY,
@@ -163,7 +165,7 @@ const LoanTracker = () => {
       alert('เพิ่มข้อมูลผิดพลาด: ' + error.message);
     } else {
       setLoans([...loans, ...data]);
-      setNewLoan({ borrowerName: '', principal: '', startDate: new Date().toISOString().split('T')[0], phone: '' });
+      setNewLoan({ borrowerName: '', principal: '', startDate: new Date().toISOString().split('T')[0], phone: '', note: '' });
       setShowAddForm(false);
     }
   };
@@ -317,6 +319,17 @@ const LoanTracker = () => {
                     />
                   </div>
                   
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">หมายเหตุ</label>
+                    <textarea
+                      value={newLoan.note}
+                      onChange={(e) => setNewLoan({ ...newLoan, note: e.target.value })}
+                      className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="ระบุหมายเหตุ (ถ้ามี)"
+                      rows={2}
+                    />
+                  </div>
+                  
                   <div className="flex gap-3 pt-4">
                     <button
                       onClick={addLoan}
@@ -409,14 +422,6 @@ const LoanTracker = () => {
                       <span className="font-extrabold text-pink-600 text-lg drop-shadow">{formatCurrency(status.totalDue)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">ดอกเบี้ย/สัปดาห์:</span>
-                      <span className="font-medium">{(status.interestRate * 100).toFixed(2)}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">ค่าปรับ/วัน:</span>
-                      <span className="font-medium">{(status.penaltyRate * 100).toFixed(2)}%</span>
-                    </div>
-                    <div className="flex justify-between">
                       <span className="text-gray-600">ครบกำหนด:</span>
                       {(() => {
                         const due = getDueText(status.nextPaymentDue.toISOString().split('T')[0]);
@@ -427,6 +432,12 @@ const LoanTracker = () => {
                       <span className="text-gray-600">วันที่กู้:</span>
                       <span className="font-medium">{formatDate(loan.startDate)}</span>
                     </div>
+                    {loan.note && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">หมายเหตุ:</span>
+                        <span className="font-medium">{loan.note}</span>
+                      </div>
+                    )}
                     {loan.phone && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">เบอร์โทร:</span>

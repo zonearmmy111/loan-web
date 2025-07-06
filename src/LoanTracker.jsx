@@ -340,6 +340,7 @@ const LoanTracker = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {loans.map(loan => {
               const status = calculateCurrentStatus(loan);
+              const isFullyPaid = status.currentPrincipal === 0 && status.interestDue === 0 && status.penalty === 0;
               
               return (
                 <div
@@ -350,6 +351,11 @@ const LoanTracker = () => {
                   onClick={() => setSelectedLoan(loan)}
                   style={{ position: 'relative' }}
                 >
+                  {isFullyPaid && (
+                    <div className="absolute top-0 left-0 w-full rounded-t-xl bg-green-100 border-b-2 border-green-400 py-2 flex items-center justify-center z-10">
+                      <span className="text-green-700 text-lg font-bold">✅ จ่ายครบแล้ว! เงินกู้เสร็จสิ้น</span>
+                    </div>
+                  )}
                   {/* ปุ่มแก้ไขอัตรา */}
                   <button
                     onClick={e => {
@@ -391,7 +397,15 @@ const LoanTracker = () => {
                       <span className="font-medium text-red-500">{formatCurrency(status.penalty)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">ต้องจ่าย:</span>
+                      <span className="text-gray-600">เงินต้นที่ต้องจ่าย:</span>
+                      <span className="font-medium text-blue-900">{formatCurrency(0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">ดอกเบี้ย+ค่าปรับที่ต้องจ่าย:</span>
+                      <span className="font-medium text-orange-500">{formatCurrency(status.interestDue + status.penalty)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">ต้องจ่ายรวม:</span>
                       <span className="font-extrabold text-pink-600 text-lg drop-shadow">{formatCurrency(status.totalDue)}</span>
                     </div>
                     <div className="flex justify-between">
@@ -508,8 +522,14 @@ const LoanTracker = () => {
 
               {(() => {
                 const status = calculateCurrentStatus(selectedLoan);
+                const isFullyPaid = status.currentPrincipal === 0 && status.interestDue === 0 && status.penalty === 0;
                 return (
                   <div className="space-y-6">
+                    {isFullyPaid && (
+                      <div className="mb-4 p-3 bg-green-100 border border-green-400 rounded-lg flex items-center justify-center">
+                        <span className="text-green-700 text-lg font-bold">✅ จ่ายครบแล้ว! เงินกู้เสร็จสิ้น</span>
+                      </div>
+                    )}
                     {/* Summary */}
                     <div className="bg-gray-50 rounded-xl p-4">
                       <h3 className="font-bold text-lg mb-3 text-gray-800">สรุปสถานะปัจจุบัน</h3>
@@ -537,6 +557,14 @@ const LoanTracker = () => {
                         <div>
                           <p className="text-sm text-gray-600">ค่าปรับ</p>
                           <p className="font-bold text-lg text-red-600">{formatCurrency(status.penalty)}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">เงินต้นที่ต้องจ่าย</p>
+                          <p className="font-bold text-lg">{formatCurrency(0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">ดอกเบี้ย+ค่าปรับที่ต้องจ่าย</p>
+                          <p className="font-bold text-lg text-orange-600">{formatCurrency(status.interestDue + status.penalty)}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">รวมต้องจ่าย</p>

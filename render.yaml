@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: loan-web
+    env: static
+    buildCommand: npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: NODE_VERSION
+        value: 18.0.0 

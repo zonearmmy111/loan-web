@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Save, X, Calendar, DollarSign, User, Trash2 } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 const LoanTracker = () => {
   const [loans, setLoans] = useState([]);
@@ -19,13 +20,23 @@ const LoanTracker = () => {
     date: new Date().toISOString().split('T')[0]
   });
 
-  // Initialize with some sample data for demonstration
+  // โหลดข้อมูล loans จาก Supabase
   useEffect(() => {
-    if (loans.length === 0) {
-      // You can remove this if you want to start with empty data
-      // setLoans([]);
-    }
+    const fetchLoans = async () => {
+      const { data, error } = await supabase.from('loans').select('*');
+      if (error) {
+        alert('โหลดข้อมูลผิดพลาด: ' + error.message);
+      } else {
+        setLoans(data);
+      }
+    };
+    fetchLoans();
   }, []);
+
+  const refreshLoans = async () => {
+    const { data, error } = await supabase.from('loans').select('*');
+    if (!error) setLoans(data);
+  };
 
   const calculateCurrentStatus = (loan) => {
     const today = new Date();
@@ -123,56 +134,57 @@ const LoanTracker = () => {
     };
   };
 
-  const addLoan = () => {
+  // เพิ่ม loan ลง Supabase
+  const addLoan = async () => {
     if (!newLoan.borrowerName || !newLoan.principal) return;
-    
-    const loan = {
-      id: Date.now(),
-      borrowerName: newLoan.borrowerName,
-      principal: parseFloat(newLoan.principal),
-      startDate: newLoan.startDate,
-      phone: newLoan.phone,
-      payments: []
-    };
-    
-    setLoans([...loans, loan]);
-    setNewLoan({ borrowerName: '', principal: '', startDate: new Date().toISOString().split('T')[0], phone: '' });
-    setShowAddForm(false);
-  };
-
-  const addPayment = (loanId) => {
-    if (!payment.amount) return;
-    
-    const updatedLoans = loans.map(loan => {
-      if (loan.id === loanId) {
-        const newPayment = {
-          id: Date.now(),
-          amount: parseFloat(payment.amount),
-          date: payment.date
-        };
-        return {
-          ...loan,
-          payments: [...(loan.payments || []), newPayment]
-        };
+    const { data, error } = await supabase.from('loans').insert([
+      {
+        borrowerName: newLoan.borrowerName,
+        principal: parseFloat(newLoan.principal),
+        startDate: newLoan.startDate,
+        phone: newLoan.phone,
+        payments: [],
       }
-      return loan;
-    });
-    
-    setLoans(updatedLoans);
-    
-    // Update selectedLoan to reflect the new payment
-    const updatedSelectedLoan = updatedLoans.find(loan => loan.id === loanId);
-    setSelectedLoan(updatedSelectedLoan);
-    
-    setPayment({ amount: '', date: new Date().toISOString().split('T')[0] });
+    ]).select();
+    if (error) {
+      alert('เพิ่มข้อมูลผิดพลาด: ' + error.message);
+    } else {
+      setLoans([...loans, ...data]);
+      setNewLoan({ borrowerName: '', principal: '', startDate: new Date().toISOString().split('T')[0], phone: '' });
+      setShowAddForm(false);
+    }
   };
 
-  const deleteLoan = (loanId) => {
+  // เพิ่ม/อัปเดต payments ใน Supabase
+  const addPayment = async (loanId) => {
+    if (!payment.amount) return;
+    const loan = loans.find(l => l.id === loanId);
+    const updatedPayments = [...(loan.payments || []), {
+      id: Date.now(),
+      amount: parseFloat(payment.amount),
+      date: payment.date
+    }];
+    const { data, error } = await supabase.from('loans').update({ payments: updatedPayments }).eq('id', loanId).select();
+    if (error) {
+      alert('บันทึกการจ่ายเงินผิดพลาด: ' + error.message);
+    } else {
+      setLoans(loans.map(l => l.id === loanId ? { ...l, payments: updatedPayments } : l));
+      setSelectedLoan({ ...loan, payments: updatedPayments });
+      setPayment({ amount: '', date: new Date().toISOString().split('T')[0] });
+    }
+  };
+
+  // ลบ loan ใน Supabase
+  const deleteLoan = async (loanId) => {
     const confirmed = window.confirm('คุณแน่ใจหรือไม่ที่จะลบข้อมูลนี้?');
     if (confirmed) {
-      const updatedLoans = loans.filter(loan => loan.id !== loanId);
-      setLoans(updatedLoans);
-      setSelectedLoan(null);
+      const { error } = await supabase.from('loans').delete().eq('id', loanId);
+      if (error) {
+        alert('ลบข้อมูลผิดพลาด: ' + error.message);
+      } else {
+        setLoans(loans.filter(loan => loan.id !== loanId));
+        setSelectedLoan(null);
+      }
     }
   };
 

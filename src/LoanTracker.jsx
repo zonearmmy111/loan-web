@@ -423,6 +423,10 @@ const LoanTracker = () => {
                         return <span className={`font-bold ${due.color}`}>{due.text}</span>;
                       })()}
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">วันที่กู้:</span>
+                      <span className="font-medium">{formatDate(loan.startDate)}</span>
+                    </div>
                     {loan.phone && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">เบอร์โทร:</span>
@@ -574,6 +578,10 @@ const LoanTracker = () => {
                           <p className="text-sm text-gray-600">ครบกำหนดจ่าย</p>
                           <p className="font-bold text-lg text-purple-600">{formatDate(status.nextPaymentDue.toISOString().split('T')[0])}</p>
                         </div>
+                        <div>
+                          <p className="text-sm text-gray-600">วันที่กู้</p>
+                          <p className="font-bold text-lg text-gray-800">{formatDate(selectedLoan.startDate)}</p>
+                        </div>
                       </div>
                       
                       {status.isOverdue && (
@@ -582,10 +590,10 @@ const LoanTracker = () => {
                         </div>
                       )}
                       
-                      {status.interestPaidThisWeek >= status.weeklyInterest && (
-                        <div className="mt-3 p-3 bg-green-100 border border-green-300 rounded-lg">
-                          <p className="text-green-800 font-medium">✅ ชำระดอกเบี้ยสัปดาห์นี้เรียบร้อยแล้ว</p>
-                          <p className="text-green-700 text-sm">การชำระเงินครั้งต่อไปจะหักต้นเงินโดยตรง</p>
+                      {status.interestPaidThisWeek >= status.weeklyInterest && status.interestDue === 0 && (
+                        <div className="mt-3 p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                          <p className="text-blue-800 font-medium">✅ ชำระดอกเบี้ยสัปดาห์นี้เรียบร้อยแล้ว</p>
+                          <p className="text-blue-700 text-sm">รอการชำระดอกเบี้ยในสัปดาห์ถัดไป</p>
                         </div>
                       )}
                     </div>

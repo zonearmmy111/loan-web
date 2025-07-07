@@ -161,11 +161,11 @@ const LoanTracker = () => {
       }
     } else {
       // ยังไม่เคยจ่ายดอกเบี้ยเลย
-      nextPaymentDue = new Date(periodEnd);
-      if (today < periodEnd) {
+      nextPaymentDue = new Date(startDate);
+      if (today < startDate) {
         interestDue = 0;
         penalty = 0;
-      } else if (today >= periodEnd && today < nextPaymentDue) {
+      } else if (today >= startDate && today < nextPaymentDue) {
         interestDue = periodInterest;
         penalty = 0;
       } else if (today >= nextPaymentDue) {

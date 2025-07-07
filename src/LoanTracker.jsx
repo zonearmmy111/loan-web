@@ -79,6 +79,11 @@ const LoanTracker = () => {
     let interestPaidThisPeriod = 0;
     let prepay = false;
     
+    // ย้ายการประกาศ principalDueDate ขึ้นมาก่อนใช้งาน
+    const principalDueDate = new Date(startDate);
+    principalDueDate.setHours(12,0,0,0);
+    principalDueDate.setDate(principalDueDate.getDate() + 7);
+
     // Sort payments by date
     const sortedPayments = [...payments].sort((a, b) => new Date(a.date) - new Date(b.date));
     
@@ -165,9 +170,6 @@ const LoanTracker = () => {
       interestDue = today < principalDueDate ? 0 : periodInterest;
       penalty = today < principalDueDate ? 0 : (today > principalDueDate ? currentPrincipal * penaltyRate * Math.floor((today - principalDueDate) / (1000 * 60 * 60 * 24)) : 0);
     }
-    const principalDueDate = new Date(startDate);
-    principalDueDate.setHours(12,0,0,0);
-    principalDueDate.setDate(principalDueDate.getDate() + 7);
     return {
       currentPrincipal,
       weeklyInterest: periodInterest,

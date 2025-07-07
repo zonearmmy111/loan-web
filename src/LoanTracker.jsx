@@ -135,7 +135,7 @@ const LoanTracker = () => {
       interestDue,
       interestPaidThisWeek,
       penalty,
-      totalDue: interestDue + penalty,
+      totalDue: currentPrincipal + interestDue + penalty,
       totalPaid,
       nextPaymentDue,
       isOverdue,

@@ -46,101 +46,101 @@ const LoanTracker = () => {
 
   const calculateCurrentStatus = (loan) => {
     const today = new Date();
+    today.setHours(0,0,0,0);
     const startDate = new Date(loan.startDate);
+    startDate.setHours(0,0,0,0);
     const payments = loan.payments || [];
     
     let currentPrincipal = loan.principal;
     let totalPaid = 0;
-    let currentWeekStart = new Date(startDate);
-    let interestPaidThisWeek = 0;
-    let lastInterestPaymentDate = null;
+    let interestPaidThisPeriod = 0;
+    let lastInterestPaidDate = null;
+    let lastDueDate = new Date(startDate);
+    let interestRate = loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST;
+    let penaltyRate = loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY;
+    let periodStart = new Date(startDate);
+    let periodEnd = new Date(periodStart);
+    periodEnd.setDate(periodEnd.getDate() + 7);
+    let foundCurrentPeriod = false;
+    let penalty = 0;
+    let interestDue = 0;
+    let nextPaymentDue = new Date(periodEnd);
     
-    // Process payments chronologically
+    // Sort payments by date
     const sortedPayments = [...payments].sort((a, b) => new Date(a.date) - new Date(b.date));
-    
-    // ใช้อัตราดอกเบี้ย/ค่าปรับจาก loan ถ้ามี ถ้าไม่มีใช้ default
-    const interestRate = loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST;
-    const penaltyRate = loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY;
     
     for (const payment of sortedPayments) {
       totalPaid += payment.amount;
       const paymentDate = new Date(payment.date);
-      
-      // Calculate which week this payment falls in
-      const weeksSinceStart = Math.floor((paymentDate - startDate) / (1000 * 60 * 60 * 24 * 7));
-      const paymentWeekStart = new Date(startDate);
-      paymentWeekStart.setDate(paymentWeekStart.getDate() + (weeksSinceStart * 7));
-      
-      // Calculate weekly interest for this period
-      const weeklyInterest = currentPrincipal * interestRate;
-      
-      // If this is the current week, track interest payments
-      const currentWeekNumber = Math.floor((today - startDate) / (1000 * 60 * 60 * 24 * 7));
-      const paymentWeekNumber = Math.floor((paymentDate - startDate) / (1000 * 60 * 60 * 24 * 7));
-      
-      if (paymentWeekNumber === currentWeekNumber) {
-        // This payment is in the current week
-        if (interestPaidThisWeek < weeklyInterest) {
-          // Still need to pay interest for this week
-          const interestPayment = Math.min(payment.amount, weeklyInterest - interestPaidThisWeek);
-          interestPaidThisWeek += interestPayment;
-          const remainingAmount = payment.amount - interestPayment;
-          
-          if (remainingAmount > 0) {
-            // Remaining amount goes to principal
-            currentPrincipal = Math.max(0, currentPrincipal - remainingAmount);
-          }
-          
-          if (interestPayment > 0) {
-            lastInterestPaymentDate = paymentDate;
-          }
-        } else {
-          // Interest already paid this week, all goes to principal
-          currentPrincipal = Math.max(0, currentPrincipal - payment.amount);
-        }
-      } else {
-        // Payment from previous weeks
-        if (payment.amount >= weeklyInterest) {
-          // Payment covers interest, remainder goes to principal
-          const principalPayment = payment.amount - weeklyInterest;
-          currentPrincipal = Math.max(0, currentPrincipal - principalPayment);
+      paymentDate.setHours(0,0,0,0);
+      // ถ้า paymentDate >= periodEnd แปลว่าข้ามรอบ ต้องเลื่อน periodStart/periodEnd
+      while (paymentDate >= periodEnd) {
+        periodStart = new Date(periodEnd);
+        periodEnd = new Date(periodStart);
+        periodEnd.setDate(periodEnd.getDate() + 7);
+      }
+      // ดอกเบี้ยรอบนี้
+      const periodInterest = currentPrincipal * interestRate;
+      let paymentLeft = payment.amount;
+      // จ่ายดอกเบี้ยรอบนี้ก่อน
+      if (interestPaidThisPeriod < periodInterest) {
+        const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
+        interestPaidThisPeriod += payInterest;
+        paymentLeft -= payInterest;
+        if (interestPaidThisPeriod >= periodInterest) {
+          lastInterestPaidDate = paymentDate;
+          lastDueDate = new Date(periodStart);
+          // เริ่มรอบใหม่
+          periodStart = new Date(paymentDate);
+          periodEnd = new Date(periodStart);
+          periodEnd.setDate(periodEnd.getDate() + 7);
+          interestPaidThisPeriod = 0;
         }
       }
+      // ส่วนที่เหลือไปตัดเงินต้น
+      if (paymentLeft > 0) {
+        currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
+      }
     }
-    
-    // Calculate next payment due date
-    const weeksSinceStart = Math.floor((today - startDate) / (1000 * 60 * 60 * 24 * 7));
-    const currentWeekStartDate = new Date(startDate);
-    currentWeekStartDate.setDate(currentWeekStartDate.getDate() + (weeksSinceStart * 7));
-    
-    const nextPaymentDue = new Date(currentWeekStartDate);
-    nextPaymentDue.setDate(nextPaymentDue.getDate() + 7);
-    
-    // Calculate current interest and penalties
-    const weeklyInterest = currentPrincipal * interestRate;
-    const interestDue = Math.max(0, weeklyInterest - interestPaidThisWeek);
-    
-    const daysSinceWeekStart = Math.floor((today - currentWeekStartDate) / (1000 * 60 * 60 * 24));
-    const isOverdue = today > nextPaymentDue;
-    
-    let penalty = 0;
-    if (isOverdue) {
-      const daysOverdue = Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
-      penalty = currentPrincipal * penaltyRate * daysOverdue;
+    // หลังวน payment ทั้งหมด ให้คำนวณรอบล่าสุด
+    const periodInterest = currentPrincipal * interestRate;
+    // ถ้าจ่ายดอกเบี้ยรอบล่าสุดครบแล้ว nextPaymentDue = periodStart + 7 วัน
+    if (lastInterestPaidDate) {
+      periodStart = new Date(lastInterestPaidDate);
+      periodEnd = new Date(periodStart);
+      periodEnd.setDate(periodEnd.getDate() + 7);
+      nextPaymentDue = new Date(periodEnd);
+      // ถ้าเลยกำหนดและยังไม่ได้จ่ายดอกเบี้ยรอบนี้ ให้คิดค่าปรับ
+      if (today > periodEnd) {
+        const daysOverdue = Math.floor((today - periodEnd) / (1000 * 60 * 60 * 24));
+        penalty = currentPrincipal * penaltyRate * daysOverdue;
+        interestDue = periodInterest;
+      } else {
+        interestDue = periodInterest - interestPaidThisPeriod;
+      }
+    } else {
+      // ยังไม่เคยจ่ายดอกเบี้ยเลย
+      nextPaymentDue = new Date(periodEnd);
+      if (today > periodEnd) {
+        const daysOverdue = Math.floor((today - periodEnd) / (1000 * 60 * 60 * 24));
+        penalty = currentPrincipal * penaltyRate * daysOverdue;
+        interestDue = periodInterest;
+      } else {
+        interestDue = periodInterest - interestPaidThisPeriod;
+      }
     }
-    
     return {
       currentPrincipal,
-      weeklyInterest,
-      interestDue,
-      interestPaidThisWeek,
+      weeklyInterest: periodInterest,
+      interestDue: Math.max(0, interestDue),
+      interestPaidThisWeek: interestPaidThisPeriod,
       penalty,
-      totalDue: currentPrincipal + interestDue + penalty,
+      totalDue: currentPrincipal + Math.max(0, interestDue) + penalty,
       totalPaid,
       nextPaymentDue,
-      isOverdue,
-      daysOverdue: isOverdue ? Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24)) : 0,
-      lastInterestPaymentDate,
+      isOverdue: today > nextPaymentDue,
+      daysOverdue: today > nextPaymentDue ? Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24)) : 0,
+      lastInterestPaymentDate: lastInterestPaidDate,
       interestRate,
       penaltyRate
     };

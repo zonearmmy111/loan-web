@@ -136,9 +136,9 @@ const LoanTracker = () => {
     // หลังวน payment ทั้งหมด ให้คำนวณรอบล่าสุด
     const periodInterest = currentPrincipal * interestRate;
     if (prepay) {
-      // ถ้าจ่ายล่วงหน้า nextPaymentDue = periodEnd + 8 วัน (workaround)
+      // ถ้าจ่ายล่วงหน้า nextPaymentDue = periodEnd + 7 วัน
       nextPaymentDue = new Date(periodEnd);
-      nextPaymentDue.setDate(nextPaymentDue.getDate() + 8);
+      nextPaymentDue.setDate(nextPaymentDue.getDate() + 7);
       if (today < periodEnd) {
         interestDue = 0;
         penalty = 0;

@@ -26,6 +26,12 @@ const LoanTracker = () => {
     date: new Date().toISOString().split('T')[0]
   });
 
+  const [editingPayment, setEditingPayment] = useState(null);
+  const [editPaymentForm, setEditPaymentForm] = useState({ amount: '', date: '' });
+
+  const [editCustomer, setEditCustomer] = useState(null);
+  const [editCustomerForm, setEditCustomerForm] = useState({ borrowerName: '', note: '', phone: '' });
+
   // โหลดข้อมูล loans จาก Supabase
   useEffect(() => {
     const fetchLoans = async () => {
@@ -53,8 +59,6 @@ const LoanTracker = () => {
     
     let currentPrincipal = loan.principal;
     let totalPaid = 0;
-    let interestPaidThisPeriod = 0;
-    let lastInterestPaidDate = null;
     let interestRate = loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST;
     let penaltyRate = loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY;
     let periodStart = new Date(startDate);
@@ -63,6 +67,9 @@ const LoanTracker = () => {
     let penalty = 0;
     let interestDue = 0;
     let nextPaymentDue = new Date(periodEnd);
+    let lastInterestPaidDate = null;
+    let interestPaidThisPeriod = 0;
+    let prepay = false;
     
     // Sort payments by date
     const sortedPayments = [...payments].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -71,55 +78,78 @@ const LoanTracker = () => {
       totalPaid += payment.amount;
       const paymentDate = new Date(payment.date);
       paymentDate.setHours(0,0,0,0);
-      // ถ้า paymentDate >= periodEnd แปลว่าข้ามรอบ ต้องเลื่อน periodStart/periodEnd
-      while (paymentDate >= periodEnd) {
-        periodStart = new Date(periodEnd);
-        periodEnd = new Date(periodStart);
-        periodEnd.setDate(periodEnd.getDate() + 7);
-        interestPaidThisPeriod = 0; // reset ดอกเบี้ยรอบใหม่
-      }
-      // ดอกเบี้ยรอบนี้
-      const periodInterest = currentPrincipal * interestRate;
-      let paymentLeft = payment.amount;
-      // จ่ายดอกเบี้ยรอบนี้ก่อน
-      if (interestPaidThisPeriod < periodInterest) {
-        const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
-        interestPaidThisPeriod += payInterest;
-        paymentLeft -= payInterest;
-        if (interestPaidThisPeriod >= periodInterest) {
-          lastInterestPaidDate = paymentDate;
-          // เริ่มรอบใหม่ทันที (early payment)
-          periodStart = new Date(paymentDate);
-          periodEnd = new Date(periodStart);
-          periodEnd.setDate(periodEnd.getDate() + 7);
-          interestPaidThisPeriod = 0;
+      // ถ้า paymentDate < periodEnd แปลว่าจ่ายก่อนครบกำหนด (prepay)
+      if (paymentDate < periodEnd) {
+        // ดอกเบี้ยรอบนี้
+        const periodInterest = currentPrincipal * interestRate;
+        let paymentLeft = payment.amount;
+        if (interestPaidThisPeriod < periodInterest) {
+          const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
+          interestPaidThisPeriod += payInterest;
+          paymentLeft -= payInterest;
+          if (interestPaidThisPeriod >= periodInterest) {
+            lastInterestPaidDate = paymentDate;
+            prepay = true;
+            // ไม่ reset รอบใหม่ทันที แต่ mark ว่าจ่ายล่วงหน้าแล้ว
+          }
         }
-      }
-      // ส่วนที่เหลือไปตัดเงินต้น
-      if (paymentLeft > 0) {
-        currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
+        if (paymentLeft > 0) {
+          currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
+        }
+      } else {
+        // จ่ายตรงหรือหลังครบกำหนด
+        // ดอกเบี้ยรอบนี้
+        const periodInterest = currentPrincipal * interestRate;
+        let paymentLeft = payment.amount;
+        if (interestPaidThisPeriod < periodInterest) {
+          const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
+          interestPaidThisPeriod += payInterest;
+          paymentLeft -= payInterest;
+          if (interestPaidThisPeriod >= periodInterest) {
+            lastInterestPaidDate = paymentDate;
+            // reset รอบใหม่ทันที
+            periodStart = new Date(paymentDate);
+            periodEnd = new Date(periodStart);
+            periodEnd.setDate(periodEnd.getDate() + 7);
+            interestPaidThisPeriod = 0;
+            prepay = false;
+          }
+        }
+        if (paymentLeft > 0) {
+          currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
+        }
       }
     }
     // หลังวน payment ทั้งหมด ให้คำนวณรอบล่าสุด
     const periodInterest = currentPrincipal * interestRate;
-    if (lastInterestPaidDate) {
-      periodStart = new Date(lastInterestPaidDate);
-      periodEnd = new Date(periodStart);
-      periodEnd.setDate(periodEnd.getDate() + 7);
+    if (prepay) {
+      // ถ้าจ่ายล่วงหน้า nextPaymentDue = periodEnd + 7 วัน (รอบใหม่เริ่มจากวันครบกำหนดเดิม)
       nextPaymentDue = new Date(periodEnd);
-      // ถ้าวันนี้ < periodEnd (ยังไม่ถึงกำหนดรอบใหม่) ไม่ต้องมีดอกเบี้ยค้างชำระ
+      nextPaymentDue.setDate(nextPaymentDue.getDate() + 7);
       if (today < periodEnd) {
         interestDue = 0;
         penalty = 0;
-      } else if (today > periodEnd) {
-        // เลยกำหนดและยังไม่ได้จ่ายดอกเบี้ยรอบนี้ ให้คิดค่าปรับ
-        const daysOverdue = Math.floor((today - periodEnd) / (1000 * 60 * 60 * 24));
-        penalty = currentPrincipal * penaltyRate * daysOverdue;
-        interestDue = periodInterest;
-      } else {
-        // ถึงวันครบกำหนดพอดี
+      } else if (today >= periodEnd && today < nextPaymentDue) {
         interestDue = periodInterest;
         penalty = 0;
+      } else if (today >= nextPaymentDue) {
+        const daysOverdue = Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
+        penalty = currentPrincipal * penaltyRate * daysOverdue;
+        interestDue = periodInterest;
+      }
+    } else if (lastInterestPaidDate) {
+      // ถ้าจ่ายตรงหรือหลังครบกำหนด nextPaymentDue = periodStart + 7 วัน
+      if (today < periodEnd) {
+        interestDue = 0;
+        penalty = 0;
+        nextPaymentDue = new Date(periodEnd);
+      } else if (today >= periodEnd && today < nextPaymentDue) {
+        interestDue = periodInterest;
+        penalty = 0;
+      } else if (today >= nextPaymentDue) {
+        const daysOverdue = Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
+        penalty = currentPrincipal * penaltyRate * daysOverdue;
+        interestDue = periodInterest;
       }
     } else {
       // ยังไม่เคยจ่ายดอกเบี้ยเลย
@@ -127,13 +157,13 @@ const LoanTracker = () => {
       if (today < periodEnd) {
         interestDue = 0;
         penalty = 0;
-      } else if (today > periodEnd) {
-        const daysOverdue = Math.floor((today - periodEnd) / (1000 * 60 * 60 * 24));
-        penalty = currentPrincipal * penaltyRate * daysOverdue;
-        interestDue = periodInterest;
-      } else {
+      } else if (today >= periodEnd && today < nextPaymentDue) {
         interestDue = periodInterest;
         penalty = 0;
+      } else if (today >= nextPaymentDue) {
+        const daysOverdue = Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
+        penalty = currentPrincipal * penaltyRate * daysOverdue;
+        interestDue = periodInterest;
       }
     }
     return {
@@ -251,6 +281,52 @@ const LoanTracker = () => {
     if (diffDays < 0) return { text: 'เกินกำหนดชำระ', color: 'text-red-600 font-bold' };
     // แสดงวันที่ปกติ
     return { text: formatDate(dueDate), color: 'text-purple-600' };
+  };
+
+  const deletePayment = async (loanId, paymentId) => {
+    const loan = loans.find(l => l.id === loanId);
+    const updatedPayments = (loan.payments || []).filter(p => p.id !== paymentId);
+    const { data, error } = await supabase.from('loans').update({ payments: updatedPayments }).eq('id', loanId).select();
+    if (!error) {
+      setLoans(loans.map(l => l.id === loanId ? { ...l, payments: updatedPayments } : l));
+      if (selectedLoan && selectedLoan.id === loanId) setSelectedLoan({ ...loan, payments: updatedPayments });
+    }
+  };
+
+  const startEditPayment = (payment) => {
+    setEditingPayment(payment.id);
+    setEditPaymentForm({ amount: payment.amount, date: payment.date });
+  };
+
+  const saveEditPayment = async (loanId, paymentId) => {
+    const loan = loans.find(l => l.id === loanId);
+    const updatedPayments = (loan.payments || []).map(p =>
+      p.id === paymentId ? { ...p, amount: parseFloat(editPaymentForm.amount), date: editPaymentForm.date } : p
+    );
+    const { data, error } = await supabase.from('loans').update({ payments: updatedPayments }).eq('id', loanId).select();
+    if (!error) {
+      setLoans(loans.map(l => l.id === loanId ? { ...l, payments: updatedPayments } : l));
+      if (selectedLoan && selectedLoan.id === loanId) setSelectedLoan({ ...loan, payments: updatedPayments });
+      setEditingPayment(null);
+    }
+  };
+
+  const startEditCustomer = (loan) => {
+    setEditCustomer(loan.id);
+    setEditCustomerForm({
+      borrowerName: loan.borrowerName || '',
+      note: loan.note || '',
+      phone: loan.phone || ''
+    });
+  };
+
+  const saveEditCustomer = async (loanId) => {
+    const { borrowerName, note, phone } = editCustomerForm;
+    const { data, error } = await supabase.from('loans').update({ borrowerName, note, phone }).eq('id', loanId).select();
+    if (!error) {
+      setLoans(loans.map(l => l.id === loanId ? { ...l, borrowerName, note, phone } : l));
+      setEditCustomer(null);
+    }
   };
 
   return (
@@ -389,12 +465,12 @@ const LoanTracker = () => {
                     className="absolute right-2 top-2 bg-yellow-200 hover:bg-yellow-300 text-yellow-800 rounded px-2 py-1 text-xs font-bold shadow"
                     title="แก้ไขอัตราดอกเบี้ย/ค่าปรับ"
                   >
-                    <Edit2 size={14} className="inline mr-1" /> แก้ไขอัตรา
+                    <Edit2 size={14} className="inline" />
                   </button>
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-2">
                       <User className="text-blue-600" size={20} />
-                      <h3 className="font-bold text-lg text-gray-800">{loan.borrowerName}</h3>
+                      <h3 className="font-bold text-lg text-gray-800 cursor-pointer hover:underline" onClick={e => { e.stopPropagation(); startEditCustomer(loan); }}>{loan.borrowerName}</h3>
                     </div>
                     {status.isOverdue && (
                       <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium">
@@ -648,12 +724,36 @@ const LoanTracker = () => {
                       {selectedLoan.payments && selectedLoan.payments.length > 0 ? (
                         <div className="space-y-2 max-h-64 overflow-y-auto">
                           {[...selectedLoan.payments].reverse().map(payment => (
-                            <div key={payment.id} className="bg-gray-50 rounded-lg p-3 flex justify-between items-center">
-                              <div>
-                                <p className="font-medium">{formatCurrency(payment.amount)}</p>
-                                <p className="text-sm text-gray-600">{formatDate(payment.date)}</p>
-                              </div>
-                              <Calendar className="text-gray-400" size={16} />
+                            <div key={payment.id} className="bg-gray-50 rounded-lg p-3 flex justify-between items-center gap-2">
+                              {editingPayment === payment.id ? (
+                                <>
+                                  <input
+                                    type="number"
+                                    value={editPaymentForm.amount}
+                                    onChange={e => setEditPaymentForm({ ...editPaymentForm, amount: e.target.value })}
+                                    className="w-24 border rounded-lg px-2 py-1 mr-2"
+                                  />
+                                  <input
+                                    type="date"
+                                    value={editPaymentForm.date}
+                                    onChange={e => setEditPaymentForm({ ...editPaymentForm, date: e.target.value })}
+                                    className="w-32 border rounded-lg px-2 py-1 mr-2"
+                                  />
+                                  <button onClick={() => saveEditPayment(selectedLoan.id, payment.id)} className="text-green-600 font-bold mr-2">บันทึก</button>
+                                  <button onClick={() => setEditingPayment(null)} className="text-gray-400 font-bold">ยกเลิก</button>
+                                </>
+                              ) : (
+                                <>
+                                  <div>
+                                    <p className="font-medium">{formatCurrency(payment.amount)}</p>
+                                    <p className="text-sm text-gray-600">{formatDate(payment.date)}</p>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <button onClick={() => startEditPayment(payment)} className="text-yellow-600 hover:text-yellow-800" title="แก้ไข"><Edit2 size={16} /></button>
+                                    <button onClick={() => deletePayment(selectedLoan.id, payment.id)} className="text-red-600 hover:text-red-800" title="ลบ"><Trash2 size={16} /></button>
+                                  </div>
+                                </>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -664,6 +764,66 @@ const LoanTracker = () => {
                   </div>
                 );
               })()}
+            </div>
+          </div>
+        )}
+
+        {/* Modal แก้ไขข้อมูลลูกค้า */}
+        {editCustomer && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">แก้ไขข้อมูลลูกค้า</h2>
+                <button onClick={() => setEditCustomer(null)} className="text-gray-400 hover:text-gray-600">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">ชื่อผู้กู้</label>
+                  <input
+                    type="text"
+                    value={editCustomerForm.borrowerName}
+                    onChange={e => setEditCustomerForm({ ...editCustomerForm, borrowerName: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="ระบุชื่อผู้กู้"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">ช่องทางการติดต่อ</label>
+                  <input
+                    type="text"
+                    value={editCustomerForm.phone}
+                    onChange={e => setEditCustomerForm({ ...editCustomerForm, phone: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="ระบุช่องทางการติดต่อ เช่น เบอร์โทร ไลน์ เฟซบุ๊ก ฯลฯ"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">หมายเหตุ</label>
+                  <textarea
+                    value={editCustomerForm.note}
+                    onChange={e => setEditCustomerForm({ ...editCustomerForm, note: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="ระบุหมายเหตุ (ถ้ามี)"
+                    rows={2}
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => saveEditCustomer(editCustomer)}
+                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    บันทึก
+                  </button>
+                  <button
+                    onClick={() => setEditCustomer(null)}
+                    className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

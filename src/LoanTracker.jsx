@@ -13,10 +13,18 @@ const LoanTracker = () => {
   const [editRateLoan, setEditRateLoan] = useState(null);
   const [rateForm, setRateForm] = useState({ interestRate: '', penaltyRate: '' });
   
+  const getLocalDateString = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const [newLoan, setNewLoan] = useState({
     borrowerName: '',
     principal: '',
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: getLocalDateString(),
     phone: '',
     note: ''
   });
@@ -167,6 +175,7 @@ const LoanTracker = () => {
       }
     }
     const principalDueDate = new Date(startDate);
+    principalDueDate.setHours(12,0,0,0);
     principalDueDate.setDate(principalDueDate.getDate() + 7);
     return {
       currentPrincipal,
@@ -205,7 +214,7 @@ const LoanTracker = () => {
       alert('เพิ่มข้อมูลผิดพลาด: ' + error.message);
     } else {
       setLoans([...loans, ...data]);
-      setNewLoan({ borrowerName: '', principal: '', startDate: new Date().toISOString().split('T')[0], phone: '', note: '' });
+      setNewLoan({ borrowerName: '', principal: '', startDate: getLocalDateString(), phone: '', note: '' });
       setShowAddForm(false);
     }
   };
@@ -268,7 +277,8 @@ const LoanTracker = () => {
   };
 
   const formatDate = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString('th-TH');
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' });
   };
 
   // เพิ่มฟังก์ชันช่วยแสดงข้อความครบกำหนด

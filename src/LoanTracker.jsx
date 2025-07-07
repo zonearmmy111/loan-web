@@ -131,9 +131,9 @@ const LoanTracker = () => {
     // หลังวน payment ทั้งหมด ให้คำนวณรอบล่าสุด
     const periodInterest = currentPrincipal * interestRate;
     if (prepay) {
-      // ถ้าจ่ายล่วงหน้า nextPaymentDue = periodEnd + 7 วัน (รอบใหม่เริ่มจากวันครบกำหนดเดิม)
+      // ถ้าจ่ายล่วงหน้า nextPaymentDue = periodEnd + 8 วัน (workaround)
       nextPaymentDue = new Date(periodEnd);
-      nextPaymentDue.setDate(nextPaymentDue.getDate() + 7);
+      nextPaymentDue.setDate(nextPaymentDue.getDate() + 8);
       if (today < periodEnd) {
         interestDue = 0;
         penalty = 0;
@@ -525,6 +525,10 @@ const LoanTracker = () => {
                       })()}
                     </div>
                     <div className="flex justify-between">
+                      <span className="text-gray-600">ครบกำหนดจ่ายเงินต้น:</span>
+                      <span className="font-bold text-purple-600">{formatDate(status.principalDueDate.toISOString().split('T')[0])}</span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-gray-600">วันที่กู้:</span>
                       <span className="font-medium">{formatDate(loan.startDate)}</span>
                     </div>
@@ -682,11 +686,11 @@ const LoanTracker = () => {
                           <p className="font-extrabold text-pink-600 text-lg drop-shadow">{formatCurrency(status.totalDue)}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-600">ครบกำหนดจ่ายดอกเบี้ย</p>
+                          <p className="text-sm text-gray-600">ครบกำหนดจ่ายดอกเบี้ย:</p>
                           <p className="font-bold text-lg text-purple-600">{formatDate(status.nextPaymentDue.toISOString().split('T')[0])}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-600">ครบกำหนดจ่ายเงินต้น</p>
+                          <p className="text-sm text-gray-600">ครบกำหนดจ่ายเงินต้น:</p>
                           <p className="font-bold text-lg text-purple-600">{formatDate(status.principalDueDate.toISOString().split('T')[0])}</p>
                         </div>
                         <div>

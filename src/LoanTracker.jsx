@@ -166,6 +166,8 @@ const LoanTracker = () => {
         interestDue = periodInterest;
       }
     }
+    const principalDueDate = new Date(startDate);
+    principalDueDate.setDate(principalDueDate.getDate() + 7);
     return {
       currentPrincipal,
       weeklyInterest: periodInterest,
@@ -175,6 +177,7 @@ const LoanTracker = () => {
       totalDue: currentPrincipal + Math.max(0, interestDue) + penalty,
       totalPaid,
       nextPaymentDue,
+      principalDueDate,
       isOverdue: today > nextPaymentDue,
       daysOverdue: today > nextPaymentDue ? Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24)) : 0,
       lastInterestPaymentDate: lastInterestPaidDate,
@@ -666,11 +669,15 @@ const LoanTracker = () => {
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">รวมต้องจ่าย</p>
-                          <p className="font-bold text-xl text-blue-600">{formatCurrency(status.totalDue)}</p>
+                          <p className="font-extrabold text-pink-600 text-lg drop-shadow">{formatCurrency(status.totalDue)}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">ครบกำหนดจ่าย</p>
                           <p className="font-bold text-lg text-purple-600">{formatDate(status.nextPaymentDue.toISOString().split('T')[0])}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">ครบกำหนดจ่ายเงินต้น</p>
+                          <p className="font-bold text-lg text-purple-600">{formatDate(status.principalDueDate.toISOString().split('T')[0])}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">วันที่กู้</p>

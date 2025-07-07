@@ -161,18 +161,9 @@ const LoanTracker = () => {
       }
     } else {
       // ยังไม่เคยจ่ายดอกเบี้ยเลย
-      nextPaymentDue = new Date(startDate);
-      if (today < startDate) {
-        interestDue = 0;
-        penalty = 0;
-      } else if (today >= startDate && today < nextPaymentDue) {
-        interestDue = periodInterest;
-        penalty = 0;
-      } else if (today >= nextPaymentDue) {
-        const daysOverdue = Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
-        penalty = currentPrincipal * penaltyRate * daysOverdue;
-        interestDue = periodInterest;
-      }
+      nextPaymentDue = new Date(principalDueDate); // ใช้วันเดียวกับครบกำหนดจ่ายเงินต้น
+      interestDue = today < principalDueDate ? 0 : periodInterest;
+      penalty = today < principalDueDate ? 0 : (today > principalDueDate ? currentPrincipal * penaltyRate * Math.floor((today - principalDueDate) / (1000 * 60 * 60 * 24)) : 0);
     }
     const principalDueDate = new Date(startDate);
     principalDueDate.setHours(12,0,0,0);

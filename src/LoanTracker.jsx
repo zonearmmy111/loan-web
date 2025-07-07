@@ -61,8 +61,8 @@ const LoanTracker = () => {
   const calculateCurrentStatus = (loan) => {
     const today = new Date();
     today.setHours(0,0,0,0);
-    const startDate = new Date(loan.startDate);
-    startDate.setHours(0,0,0,0);
+    const [yyyy, mm, dd] = loan.startDate.split('-');
+    const startDate = new Date(Number(yyyy), Number(mm) - 1, Number(dd), 12, 0, 0, 0);
     const payments = loan.payments || [];
     
     let currentPrincipal = loan.principal;

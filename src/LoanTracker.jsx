@@ -508,7 +508,7 @@ const LoanTracker = () => {
                       <span className="font-extrabold text-pink-600 text-lg drop-shadow">{formatCurrency(status.totalDue)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">ครบกำหนด:</span>
+                      <span className="text-gray-600">ครบกำหนดจ่ายดอกเบี้ย:</span>
                       {(() => {
                         const due = getDueText(status.nextPaymentDue.toISOString().split('T')[0]);
                         return <span className={`font-bold ${due.color}`}>{due.text}</span>;
@@ -672,7 +672,7 @@ const LoanTracker = () => {
                           <p className="font-extrabold text-pink-600 text-lg drop-shadow">{formatCurrency(status.totalDue)}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-600">ครบกำหนดจ่าย</p>
+                          <p className="text-sm text-gray-600">ครบกำหนดจ่ายดอกเบี้ย</p>
                           <p className="font-bold text-lg text-purple-600">{formatDate(status.nextPaymentDue.toISOString().split('T')[0])}</p>
                         </div>
                         <div>

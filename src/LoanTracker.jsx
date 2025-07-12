@@ -457,9 +457,12 @@ const LoanTracker = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...loans]
               .sort((a, b) => {
-                const aDue = calculateCurrentStatus(a).nextPaymentDue;
-                const bDue = calculateCurrentStatus(b).nextPaymentDue;
-                return aDue - bDue;
+                const aStatus = calculateCurrentStatus(a);
+                const bStatus = calculateCurrentStatus(b);
+                // เลือกวันที่สำหรับเปรียบเทียบตาม paidInterest
+                const aKey = a.paidInterest ? aStatus.principalDueDate : aStatus.nextPaymentDue;
+                const bKey = b.paidInterest ? bStatus.principalDueDate : bStatus.nextPaymentDue;
+                return aKey - bKey;
               })
               .map(loan => {
                 const status = calculateCurrentStatus(loan);

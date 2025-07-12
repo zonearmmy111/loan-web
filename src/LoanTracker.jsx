@@ -497,7 +497,10 @@ const LoanTracker = () => {
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-2">
                         <User className={loan.paidInterest ? "text-green-600" : "text-blue-600"} size={20} />
-                        <h3 className="font-bold text-lg text-gray-800 cursor-pointer hover:underline" onClick={e => { e.stopPropagation(); startEditCustomer(loan); }}>{loan.borrowerName}</h3>
+                        <h3 className={`font-bold text-lg cursor-pointer hover:underline ${loan.paidInterest ? 'text-green-700' : 'text-gray-800'}`}
+                          onClick={e => { e.stopPropagation(); startEditCustomer(loan); }}>
+                          {loan.borrowerName}
+                        </h3>
                       </div>
                       {status.isOverdue && (
                         <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium">

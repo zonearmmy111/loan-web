@@ -26,7 +26,8 @@ const LoanTracker = () => {
     principal: '',
     startDate: getLocalDateString(),
     phone: '',
-    note: ''
+    note: '',
+    paidInterest: false
   });
 
   const [payment, setPayment] = useState({
@@ -38,7 +39,7 @@ const LoanTracker = () => {
   const [editPaymentForm, setEditPaymentForm] = useState({ amount: '', date: '' });
 
   const [editCustomer, setEditCustomer] = useState(null);
-  const [editCustomerForm, setEditCustomerForm] = useState({ borrowerName: '', note: '', phone: '' });
+  const [editCustomerForm, setEditCustomerForm] = useState({ borrowerName: '', note: '', phone: '', paidInterest: false });
 
   // โหลดข้อมูล loans จาก Supabase
   useEffect(() => {
@@ -201,13 +202,14 @@ const LoanTracker = () => {
         payments: [],
         interestRate: DEFAULT_INTEREST,
         penaltyRate: DEFAULT_PENALTY,
+        paidInterest: newLoan.paidInterest
       }
     ]).select();
     if (error) {
       alert('เพิ่มข้อมูลผิดพลาด: ' + error.message);
     } else {
       setLoans([...loans, ...data]);
-      setNewLoan({ borrowerName: '', principal: '', startDate: getLocalDateString(), phone: '', note: '' });
+      setNewLoan({ borrowerName: '', principal: '', startDate: getLocalDateString(), phone: '', note: '', paidInterest: false });
       setShowAddForm(false);
     }
   };
@@ -322,15 +324,16 @@ const LoanTracker = () => {
     setEditCustomerForm({
       borrowerName: loan.borrowerName || '',
       note: loan.note || '',
-      phone: loan.phone || ''
+      phone: loan.phone || '',
+      paidInterest: loan.paidInterest || false
     });
   };
 
   const saveEditCustomer = async (loanId) => {
-    const { borrowerName, note, phone } = editCustomerForm;
-    const { data, error } = await supabase.from('loans').update({ borrowerName, note, phone }).eq('id', loanId).select();
+    const { borrowerName, note, phone, paidInterest } = editCustomerForm;
+    const { data, error } = await supabase.from('loans').update({ borrowerName, note, phone, paidInterest }).eq('id', loanId).select();
     if (!error) {
-      setLoans(loans.map(l => l.id === loanId ? { ...l, borrowerName, note, phone } : l));
+      setLoans(loans.map(l => l.id === loanId ? { ...l, borrowerName, note, phone, paidInterest } : l));
       setEditCustomer(null);
     }
   };
@@ -419,6 +422,18 @@ const LoanTracker = () => {
                     />
                   </div>
                   
+                  <div>
+                    <label className="inline-flex items-center mt-2">
+                      <input
+                        type="checkbox"
+                        checked={newLoan.paidInterest}
+                        onChange={e => setNewLoan({ ...newLoan, paidInterest: e.target.checked })}
+                        className="form-checkbox h-5 w-5 text-green-600"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">ตัดดอกแล้ว</span>
+                    </label>
+                  </div>
+                  
                   <div className="flex gap-3 pt-4">
                     <button
                       onClick={addLoan}
@@ -481,7 +496,7 @@ const LoanTracker = () => {
                     </button>
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-2">
-                        <User className="text-blue-600" size={20} />
+                        <User className={loan.paidInterest ? "text-green-600" : "text-blue-600"} size={20} />
                         <h3 className="font-bold text-lg text-gray-800 cursor-pointer hover:underline" onClick={e => { e.stopPropagation(); startEditCustomer(loan); }}>{loan.borrowerName}</h3>
                       </div>
                       {status.isOverdue && (
@@ -828,6 +843,17 @@ const LoanTracker = () => {
                     placeholder="ระบุหมายเหตุ (ถ้ามี)"
                     rows={2}
                   />
+                </div>
+                <div>
+                  <label className="inline-flex items-center mt-2">
+                    <input
+                      type="checkbox"
+                      checked={editCustomerForm.paidInterest}
+                      onChange={e => setEditCustomerForm({ ...editCustomerForm, paidInterest: e.target.checked })}
+                      className="form-checkbox h-5 w-5 text-green-600"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">ตัดดอกแล้ว</span>
+                  </label>
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button

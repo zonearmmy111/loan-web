@@ -440,107 +440,113 @@ const LoanTracker = () => {
 
           {/* Loans List */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {loans.map(loan => {
-              const status = calculateCurrentStatus(loan);
-              const isFullyPaid = status.currentPrincipal === 0 && status.interestDue === 0 && status.penalty === 0;
-              
-              return (
-                <div
-                  key={loan.id}
-                  className={`bg-white border-2 rounded-xl p-4 cursor-pointer transition-all hover:shadow-lg ${
-                    status.isOverdue ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-blue-300'
-                  }`}
-                  onClick={() => setSelectedLoan(loan)}
-                  style={{ position: 'relative' }}
-                >
-                  {isFullyPaid && (
-                    <div className="absolute top-0 left-0 w-full rounded-t-xl bg-green-100 border-b-2 border-green-400 py-2 flex items-center justify-center z-10">
-                      <span className="text-green-700 text-lg font-bold">✅ จ่ายครบแล้ว! เงินกู้เสร็จสิ้น</span>
-                    </div>
-                  )}
-                  {/* ปุ่มแก้ไขอัตรา */}
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      setEditRateLoan(loan);
-                      setRateForm({
-                        interestRate: loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST,
-                        penaltyRate: loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY,
-                      });
-                    }}
-                    className="absolute right-2 top-2 bg-yellow-200 hover:bg-yellow-300 text-yellow-800 rounded px-2 py-1 text-xs font-bold shadow"
-                    title="แก้ไขอัตราดอกเบี้ย/ค่าปรับ"
+            {[...loans]
+              .sort((a, b) => {
+                const aDue = calculateCurrentStatus(a).nextPaymentDue;
+                const bDue = calculateCurrentStatus(b).nextPaymentDue;
+                return aDue - bDue;
+              })
+              .map(loan => {
+                const status = calculateCurrentStatus(loan);
+                const isFullyPaid = status.currentPrincipal === 0 && status.interestDue === 0 && status.penalty === 0;
+                
+                return (
+                  <div
+                    key={loan.id}
+                    className={`bg-white border-2 rounded-xl p-4 cursor-pointer transition-all hover:shadow-lg ${
+                      status.isOverdue ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:border-blue-300'
+                    }`}
+                    onClick={() => setSelectedLoan(loan)}
+                    style={{ position: 'relative' }}
                   >
-                    <Edit2 size={14} className="inline" />
-                  </button>
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-2">
-                      <User className="text-blue-600" size={20} />
-                      <h3 className="font-bold text-lg text-gray-800 cursor-pointer hover:underline" onClick={e => { e.stopPropagation(); startEditCustomer(loan); }}>{loan.borrowerName}</h3>
-                    </div>
-                    {status.isOverdue && (
-                      <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium">
-                        เกินกำหนด {status.daysOverdue} วัน
-                      </span>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">เงินต้นคงเหลือ:</span>
-                      <span className="font-medium text-blue-900">{formatCurrency(status.currentPrincipal)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">ดอกเบี้ยค้างชำระ:</span>
-                      <span className="font-medium text-orange-500">{formatCurrency(status.interestDue)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">ค่าปรับ:</span>
-                      <span className="font-medium text-red-500">{formatCurrency(status.penalty)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">เงินต้นที่ต้องจ่าย:</span>
-                      <span className="font-medium text-blue-900">{formatCurrency(0)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">ดอกเบี้ย+ค่าปรับที่ต้องจ่าย:</span>
-                      <span className="font-medium text-orange-500">{formatCurrency(status.interestDue + status.penalty)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">ต้องจ่ายรวม:</span>
-                      <span className="font-extrabold text-pink-600 text-lg drop-shadow">{formatCurrency(status.totalDue)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">ครบกำหนดจ่ายดอกเบี้ย:</span>
-                      {(() => {
-                        const due = getDueText(status.nextPaymentDue.toISOString().split('T')[0]);
-                        return <span className={`font-bold ${due.color}`}>{due.text}</span>;
-                      })()}
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">ครบกำหนดจ่ายเงินต้น:</span>
-                      <span className="font-bold text-purple-600">{formatDate(status.principalDueDate.toISOString().split('T')[0])}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">วันที่กู้:</span>
-                      <span className="font-medium">{formatDate(loan.startDate)}</span>
-                    </div>
-                    {loan.note && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">หมายเหตุ:</span>
-                        <span className="font-medium">{loan.note}</span>
+                    {isFullyPaid && (
+                      <div className="absolute top-0 left-0 w-full rounded-t-xl bg-green-100 border-b-2 border-green-400 py-2 flex items-center justify-center z-10">
+                        <span className="text-green-700 text-lg font-bold">✅ จ่ายครบแล้ว! เงินกู้เสร็จสิ้น</span>
                       </div>
                     )}
-                    {loan.phone && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">ช่องทางการติดต่อ:</span>
-                        <span className="font-medium">{loan.phone}</span>
+                    {/* ปุ่มแก้ไขอัตรา */}
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        setEditRateLoan(loan);
+                        setRateForm({
+                          interestRate: loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST,
+                          penaltyRate: loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY,
+                        });
+                      }}
+                      className="absolute right-2 top-2 bg-yellow-200 hover:bg-yellow-300 text-yellow-800 rounded px-2 py-1 text-xs font-bold shadow"
+                      title="แก้ไขอัตราดอกเบี้ย/ค่าปรับ"
+                    >
+                      <Edit2 size={14} className="inline" />
+                    </button>
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-2">
+                        <User className="text-blue-600" size={20} />
+                        <h3 className="font-bold text-lg text-gray-800 cursor-pointer hover:underline" onClick={e => { e.stopPropagation(); startEditCustomer(loan); }}>{loan.borrowerName}</h3>
                       </div>
-                    )}
+                      {status.isOverdue && (
+                        <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium">
+                          เกินกำหนด {status.daysOverdue} วัน
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">เงินต้นคงเหลือ:</span>
+                        <span className="font-medium text-blue-900">{formatCurrency(status.currentPrincipal)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">ดอกเบี้ยค้างชำระ:</span>
+                        <span className="font-medium text-orange-500">{formatCurrency(status.interestDue)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">ค่าปรับ:</span>
+                        <span className="font-medium text-red-500">{formatCurrency(status.penalty)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">เงินต้นที่ต้องจ่าย:</span>
+                        <span className="font-medium text-blue-900">{formatCurrency(0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">ดอกเบี้ย+ค่าปรับที่ต้องจ่าย:</span>
+                        <span className="font-medium text-orange-500">{formatCurrency(status.interestDue + status.penalty)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">ต้องจ่ายรวม:</span>
+                        <span className="font-extrabold text-pink-600 text-lg drop-shadow">{formatCurrency(status.totalDue)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">ครบกำหนดจ่ายดอกเบี้ย:</span>
+                        {(() => {
+                          const due = getDueText(status.nextPaymentDue.toISOString().split('T')[0]);
+                          return <span className={`font-bold ${due.color}`}>{due.text}</span>;
+                        })()}
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">ครบกำหนดจ่ายเงินต้น:</span>
+                        <span className="font-bold text-purple-600">{formatDate(status.principalDueDate.toISOString().split('T')[0])}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">วันที่กู้:</span>
+                        <span className="font-medium">{formatDate(loan.startDate)}</span>
+                      </div>
+                      {loan.note && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">หมายเหตุ:</span>
+                          <span className="font-medium">{loan.note}</span>
+                        </div>
+                      )}
+                      {loan.phone && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">ช่องทางการติดต่อ:</span>
+                          <span className="font-medium">{loan.phone}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
 
           {loans.length === 0 && (

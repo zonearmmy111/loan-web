@@ -203,6 +203,121 @@ const LoanTracker = ({ loans, refreshLoans }) => {
     }
   };
 
+  // เพิ่มฟังก์ชันนี้ไว้ก่อน return
+  const calculateCurrentStatus = (loan) => {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const [yyyy, mm, dd] = loan.startDate.split('-');
+    const startDate = new Date(Number(yyyy), Number(mm) - 1, Number(dd), 12, 0, 0, 0);
+    const payments = loan.payments || [];
+    let currentPrincipal = loan.principal;
+    let totalPaid = 0;
+    let interestRate = loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST;
+    let penaltyRate = loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY;
+    let periodStart = new Date(startDate);
+    let periodEnd = new Date(periodStart);
+    periodEnd.setDate(periodEnd.getDate() + 7);
+    let penalty = 0;
+    let interestDue = 0;
+    let nextPaymentDue = new Date(periodEnd);
+    let lastInterestPaidDate = null;
+    let interestPaidThisPeriod = 0;
+    let prepay = false;
+    const principalDueDate = new Date(startDate);
+    principalDueDate.setHours(12,0,0,0);
+    principalDueDate.setDate(principalDueDate.getDate() + 7);
+    const sortedPayments = [...payments].sort((a, b) => new Date(a.date) - new Date(b.date));
+    for (const payment of sortedPayments) {
+      totalPaid += payment.amount;
+      const paymentDate = new Date(payment.date);
+      paymentDate.setHours(0,0,0,0);
+      if (paymentDate < periodEnd) {
+        const periodInterest = currentPrincipal * interestRate;
+        let paymentLeft = payment.amount;
+        if (interestPaidThisPeriod < periodInterest) {
+          const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
+          interestPaidThisPeriod += payInterest;
+          paymentLeft -= payInterest;
+          if (interestPaidThisPeriod >= periodInterest) {
+            lastInterestPaidDate = paymentDate;
+            prepay = true;
+          }
+        }
+        if (paymentLeft > 0) {
+          currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
+        }
+      } else {
+        const periodInterest = currentPrincipal * interestRate;
+        let paymentLeft = payment.amount;
+        if (interestPaidThisPeriod < periodInterest) {
+          const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
+          interestPaidThisPeriod += payInterest;
+          paymentLeft -= payInterest;
+          if (interestPaidThisPeriod >= periodInterest) {
+            lastInterestPaidDate = paymentDate;
+            periodStart = new Date(paymentDate);
+            periodEnd = new Date(periodStart);
+            periodEnd.setDate(periodEnd.getDate() + 7);
+            interestPaidThisPeriod = 0;
+            prepay = false;
+          }
+        }
+        if (paymentLeft > 0) {
+          currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
+        }
+      }
+    }
+    const periodInterest = currentPrincipal * interestRate;
+    if (prepay) {
+      nextPaymentDue = new Date(periodEnd);
+      nextPaymentDue.setDate(nextPaymentDue.getDate() + 7);
+      if (today < periodEnd) {
+        interestDue = 0;
+        penalty = 0;
+      } else if (today >= periodEnd && today < nextPaymentDue) {
+        interestDue = periodInterest;
+        penalty = 0;
+      } else if (today >= nextPaymentDue) {
+        const daysOverdue = Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
+        penalty = currentPrincipal * penaltyRate * daysOverdue;
+        interestDue = periodInterest;
+      }
+    } else if (lastInterestPaidDate) {
+      if (today < periodEnd) {
+        interestDue = 0;
+        penalty = 0;
+        nextPaymentDue = new Date(periodEnd);
+      } else if (today >= periodEnd && today < nextPaymentDue) {
+        interestDue = periodInterest;
+        penalty = 0;
+      } else if (today >= nextPaymentDue) {
+        const daysOverdue = Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
+        penalty = currentPrincipal * penaltyRate * daysOverdue;
+        interestDue = periodInterest;
+      }
+    } else {
+      nextPaymentDue = new Date(principalDueDate);
+      interestDue = today < principalDueDate ? 0 : periodInterest;
+      penalty = today < principalDueDate ? 0 : (today > principalDueDate ? currentPrincipal * penaltyRate * Math.floor((today - principalDueDate) / (1000 * 60 * 60 * 24)) : 0);
+    }
+    return {
+      currentPrincipal,
+      weeklyInterest: periodInterest,
+      interestDue: Math.max(0, interestDue),
+      interestPaidThisWeek: interestPaidThisPeriod,
+      penalty,
+      totalDue: currentPrincipal + Math.max(0, interestDue) + penalty,
+      totalPaid,
+      nextPaymentDue,
+      principalDueDate,
+      isOverdue: today > nextPaymentDue,
+      daysOverdue: today > nextPaymentDue ? Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24)) : 0,
+      lastInterestPaymentDate: lastInterestPaidDate,
+      interestRate,
+      penaltyRate
+    };
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-7xl mx-auto">

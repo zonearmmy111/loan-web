@@ -97,8 +97,12 @@ const Summary = ({ loans }) => {
     const s = getStatus(l);
     return sum + s.currentPrincipal + s.interestDue + s.penalty;
   }, 0);
-  // รวมกำไร (ดอกเบี้ยที่เก็บได้ = totalPaid - เงินต้นทั้งหมด)
-  const profit = Math.max(0, totalPaid - totalPrincipal);
+  // กำไร = ผลรวมของกำไรแต่ละ loan (คิดแยกทีละคน)
+  const profit = loans.reduce((sum, l) => {
+    const totalPaid = (l.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
+    const principal = l.principal || 0;
+    return sum + Math.max(0, totalPaid - principal);
+  }, 0);
   // จำนวนลูกค้าที่ปิดบัญชี (จ่ายครบ)
   const fullyPaidCount = loans.filter(l => {
     const s = getStatus(l);

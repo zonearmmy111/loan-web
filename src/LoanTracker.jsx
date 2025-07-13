@@ -5,13 +5,13 @@ import { supabase } from './supabaseClient';
 const DEFAULT_INTEREST = 0.2;
 const DEFAULT_PENALTY = 0.05;
 
-const LoanTracker = () => {
-  const [loans, setLoans] = useState([]);
+const LoanTracker = ({ loans, refreshLoans }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingLoan, setEditingLoan] = useState(null);
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [editRateLoan, setEditRateLoan] = useState(null);
   const [rateForm, setRateForm] = useState({ interestRate: '', penaltyRate: '' });
+  const [activeTab, setActiveTab] = useState('active'); // 'active' หรือ 'paid'
   
   const getLocalDateString = () => {
     const today = new Date();
@@ -48,146 +48,11 @@ const LoanTracker = () => {
       if (error) {
         alert('โหลดข้อมูลผิดพลาด: ' + error.message);
       } else {
-        setLoans(data);
+        refreshLoans(data);
       }
     };
     fetchLoans();
   }, []);
-
-  const refreshLoans = async () => {
-    const { data, error } = await supabase.from('loans').select('*');
-    if (!error) setLoans(data);
-  };
-
-  const calculateCurrentStatus = (loan) => {
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const [yyyy, mm, dd] = loan.startDate.split('-');
-    const startDate = new Date(Number(yyyy), Number(mm) - 1, Number(dd), 12, 0, 0, 0);
-    const payments = loan.payments || [];
-    
-    let currentPrincipal = loan.principal;
-    let totalPaid = 0;
-    let interestRate = loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST;
-    let penaltyRate = loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY;
-    let periodStart = new Date(startDate);
-    let periodEnd = new Date(periodStart);
-    periodEnd.setDate(periodEnd.getDate() + 7);
-    let penalty = 0;
-    let interestDue = 0;
-    let nextPaymentDue = new Date(periodEnd);
-    let lastInterestPaidDate = null;
-    let interestPaidThisPeriod = 0;
-    let prepay = false;
-    
-    // ย้ายการประกาศ principalDueDate ขึ้นมาก่อนใช้งาน
-    const principalDueDate = new Date(startDate);
-    principalDueDate.setHours(12,0,0,0);
-    principalDueDate.setDate(principalDueDate.getDate() + 7);
-
-    // Sort payments by date
-    const sortedPayments = [...payments].sort((a, b) => new Date(a.date) - new Date(b.date));
-    
-    for (const payment of sortedPayments) {
-      totalPaid += payment.amount;
-      const paymentDate = new Date(payment.date);
-      paymentDate.setHours(0,0,0,0);
-      // ถ้า paymentDate < periodEnd แปลว่าจ่ายก่อนครบกำหนด (prepay)
-      if (paymentDate < periodEnd) {
-        // ดอกเบี้ยรอบนี้
-        const periodInterest = currentPrincipal * interestRate;
-        let paymentLeft = payment.amount;
-        if (interestPaidThisPeriod < periodInterest) {
-          const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
-          interestPaidThisPeriod += payInterest;
-          paymentLeft -= payInterest;
-          if (interestPaidThisPeriod >= periodInterest) {
-            lastInterestPaidDate = paymentDate;
-            prepay = true;
-            // ไม่ reset รอบใหม่ทันที แต่ mark ว่าจ่ายล่วงหน้าแล้ว
-          }
-        }
-        if (paymentLeft > 0) {
-          currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
-        }
-      } else {
-        // จ่ายตรงหรือหลังครบกำหนด
-        // ดอกเบี้ยรอบนี้
-        const periodInterest = currentPrincipal * interestRate;
-        let paymentLeft = payment.amount;
-        if (interestPaidThisPeriod < periodInterest) {
-          const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
-          interestPaidThisPeriod += payInterest;
-          paymentLeft -= payInterest;
-          if (interestPaidThisPeriod >= periodInterest) {
-            lastInterestPaidDate = paymentDate;
-            // reset รอบใหม่ทันที
-            periodStart = new Date(paymentDate);
-            periodEnd = new Date(periodStart);
-            periodEnd.setDate(periodEnd.getDate() + 7);
-            interestPaidThisPeriod = 0;
-            prepay = false;
-          }
-        }
-        if (paymentLeft > 0) {
-          currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
-        }
-      }
-    }
-    // หลังวน payment ทั้งหมด ให้คำนวณรอบล่าสุด
-    const periodInterest = currentPrincipal * interestRate;
-    if (prepay) {
-      // ถ้าจ่ายล่วงหน้า nextPaymentDue = periodEnd + 7 วัน
-      nextPaymentDue = new Date(periodEnd);
-      nextPaymentDue.setDate(nextPaymentDue.getDate() + 7);
-      if (today < periodEnd) {
-        interestDue = 0;
-        penalty = 0;
-      } else if (today >= periodEnd && today < nextPaymentDue) {
-        interestDue = periodInterest;
-        penalty = 0;
-      } else if (today >= nextPaymentDue) {
-        const daysOverdue = Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
-        penalty = currentPrincipal * penaltyRate * daysOverdue;
-        interestDue = periodInterest;
-      }
-    } else if (lastInterestPaidDate) {
-      // ถ้าจ่ายตรงหรือหลังครบกำหนด nextPaymentDue = periodStart + 7 วัน
-      if (today < periodEnd) {
-        interestDue = 0;
-        penalty = 0;
-        nextPaymentDue = new Date(periodEnd);
-      } else if (today >= periodEnd && today < nextPaymentDue) {
-        interestDue = periodInterest;
-        penalty = 0;
-      } else if (today >= nextPaymentDue) {
-        const daysOverdue = Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
-        penalty = currentPrincipal * penaltyRate * daysOverdue;
-        interestDue = periodInterest;
-      }
-    } else {
-      // ยังไม่เคยจ่ายดอกเบี้ยเลย
-      nextPaymentDue = new Date(principalDueDate); // ใช้วันเดียวกับครบกำหนดจ่ายเงินต้น
-      interestDue = today < principalDueDate ? 0 : periodInterest;
-      penalty = today < principalDueDate ? 0 : (today > principalDueDate ? currentPrincipal * penaltyRate * Math.floor((today - principalDueDate) / (1000 * 60 * 60 * 24)) : 0);
-    }
-    return {
-      currentPrincipal,
-      weeklyInterest: periodInterest,
-      interestDue: Math.max(0, interestDue),
-      interestPaidThisWeek: interestPaidThisPeriod,
-      penalty,
-      totalDue: currentPrincipal + Math.max(0, interestDue) + penalty,
-      totalPaid,
-      nextPaymentDue,
-      principalDueDate,
-      isOverdue: today > nextPaymentDue,
-      daysOverdue: today > nextPaymentDue ? Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24)) : 0,
-      lastInterestPaymentDate: lastInterestPaidDate,
-      interestRate,
-      penaltyRate
-    };
-  };
 
   // เพิ่ม loan ลง Supabase
   const addLoan = async () => {
@@ -208,7 +73,7 @@ const LoanTracker = () => {
     if (error) {
       alert('เพิ่มข้อมูลผิดพลาด: ' + error.message);
     } else {
-      setLoans([...loans, ...data]);
+      refreshLoans([...loans, ...data]);
       setNewLoan({ borrowerName: '', principal: '', startDate: getLocalDateString(), phone: '', note: '', paidInterest: false });
       setShowAddForm(false);
     }
@@ -227,7 +92,7 @@ const LoanTracker = () => {
     if (error) {
       alert('บันทึกการจ่ายเงินผิดพลาด: ' + error.message);
     } else {
-      setLoans(loans.map(l => l.id === loanId ? { ...l, payments: updatedPayments } : l));
+      refreshLoans(loans.map(l => l.id === loanId ? { ...l, payments: updatedPayments } : l));
       setSelectedLoan({ ...loan, payments: updatedPayments });
       setPayment({ amount: '', date: new Date().toISOString().split('T')[0] });
     }
@@ -241,7 +106,7 @@ const LoanTracker = () => {
       if (error) {
         alert('ลบข้อมูลผิดพลาด: ' + error.message);
       } else {
-        setLoans(loans.filter(loan => loan.id !== loanId));
+        refreshLoans(loans.filter(loan => loan.id !== loanId));
         setSelectedLoan(null);
       }
     }
@@ -296,7 +161,7 @@ const LoanTracker = () => {
     const updatedPayments = (loan.payments || []).filter(p => p.id !== paymentId);
     const { data, error } = await supabase.from('loans').update({ payments: updatedPayments }).eq('id', loanId).select();
     if (!error) {
-      setLoans(loans.map(l => l.id === loanId ? { ...l, payments: updatedPayments } : l));
+      refreshLoans(loans.map(l => l.id === loanId ? { ...l, payments: updatedPayments } : l));
       if (selectedLoan && selectedLoan.id === loanId) setSelectedLoan({ ...loan, payments: updatedPayments });
     }
   };
@@ -313,7 +178,7 @@ const LoanTracker = () => {
     );
     const { data, error } = await supabase.from('loans').update({ payments: updatedPayments }).eq('id', loanId).select();
     if (!error) {
-      setLoans(loans.map(l => l.id === loanId ? { ...l, payments: updatedPayments } : l));
+      refreshLoans(loans.map(l => l.id === loanId ? { ...l, payments: updatedPayments } : l));
       if (selectedLoan && selectedLoan.id === loanId) setSelectedLoan({ ...loan, payments: updatedPayments });
       setEditingPayment(null);
     }
@@ -333,7 +198,7 @@ const LoanTracker = () => {
     const { borrowerName, note, phone, paidInterest } = editCustomerForm;
     const { data, error } = await supabase.from('loans').update({ borrowerName, note, phone, paidInterest }).eq('id', loanId).select();
     if (!error) {
-      setLoans(loans.map(l => l.id === loanId ? { ...l, borrowerName, note, phone, paidInterest } : l));
+      refreshLoans(loans.map(l => l.id === loanId ? { ...l, borrowerName, note, phone, paidInterest } : l));
       setEditCustomer(null);
     }
   };
@@ -453,9 +318,30 @@ const LoanTracker = () => {
             </div>
           )}
 
+          {/* Tabs for Active / Fully Paid */}
+          <div className="flex gap-2 mb-4">
+            <button
+              className={`px-4 py-2 rounded-lg font-bold border-2 transition-colors ${activeTab === 'active' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-blue-300 hover:bg-blue-50'}`}
+              onClick={() => setActiveTab('active')}
+            >
+              ลูกค้าที่ค้างชำระ
+            </button>
+            <button
+              className={`px-4 py-2 rounded-lg font-bold border-2 transition-colors ${activeTab === 'paid' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-green-600 border-green-300 hover:bg-green-50'}`}
+              onClick={() => setActiveTab('paid')}
+            >
+              ลูกค้าที่จ่ายครบแล้ว
+            </button>
+          </div>
+
           {/* Loans List */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...loans]
+              .filter(loan => {
+                const status = calculateCurrentStatus(loan);
+                const isFullyPaid = status.currentPrincipal === 0 && status.interestDue === 0 && status.penalty === 0;
+                return activeTab === 'active' ? !isFullyPaid : isFullyPaid;
+              })
               .sort((a, b) => {
                 const aStatus = calculateCurrentStatus(a);
                 const bStatus = calculateCurrentStatus(b);

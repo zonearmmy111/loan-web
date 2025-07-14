@@ -615,16 +615,12 @@ const LoanTracker = ({ loans, refreshLoans }) => {
             <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">รายละเอียด - {selectedLoan.borrowerName}</h2>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteLoan(selectedLoan.id);
-                    }}
-                    className="text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                    title="ลบรายการ"
+                    className="bg-green-600 text-white px-4 py-1 rounded-lg font-bold hover:bg-green-700 transition-colors"
+                    onClick={() => setShowBill(true)}
                   >
-                    <Trash2 size={20} />
+                    ออกบิล
                   </button>
                   <button
                     onClick={() => setSelectedLoan(null)}

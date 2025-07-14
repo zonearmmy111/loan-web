@@ -28,7 +28,8 @@ const LoanTracker = ({ loans, refreshLoans }) => {
     startDate: getLocalDateString(),
     phone: '',
     note: '',
-    paidInterest: false
+    paidInterest: false,
+    hasCollateral: false
   });
 
   const [payment, setPayment] = useState({
@@ -40,7 +41,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
   const [editPaymentForm, setEditPaymentForm] = useState({ amount: '', date: '' });
 
   const [editCustomer, setEditCustomer] = useState(null);
-  const [editCustomerForm, setEditCustomerForm] = useState({ borrowerName: '', note: '', phone: '', paidInterest: false });
+  const [editCustomerForm, setEditCustomerForm] = useState({ borrowerName: '', note: '', phone: '', paidInterest: false, hasCollateral: false });
 
   // โหลดข้อมูล loans จาก Supabase
   useEffect(() => {
@@ -68,14 +69,15 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         payments: [],
         interestRate: DEFAULT_INTEREST,
         penaltyRate: DEFAULT_PENALTY,
-        paidInterest: newLoan.paidInterest
+        paidInterest: newLoan.paidInterest,
+        hasCollateral: newLoan.hasCollateral
       }
     ]).select();
     if (error) {
       alert('เพิ่มข้อมูลผิดพลาด: ' + error.message);
     } else {
       refreshLoans([...loans, ...data]);
-      setNewLoan({ borrowerName: '', principal: '', startDate: getLocalDateString(), phone: '', note: '', paidInterest: false });
+      setNewLoan({ borrowerName: '', principal: '', startDate: getLocalDateString(), phone: '', note: '', paidInterest: false, hasCollateral: false });
       setShowAddForm(false);
     }
   };
@@ -191,15 +193,16 @@ const LoanTracker = ({ loans, refreshLoans }) => {
       borrowerName: loan.borrowerName || '',
       note: loan.note || '',
       phone: loan.phone || '',
-      paidInterest: loan.paidInterest || false
+      paidInterest: loan.paidInterest || false,
+      hasCollateral: loan.hasCollateral || false
     });
   };
 
   const saveEditCustomer = async (loanId) => {
-    const { borrowerName, note, phone, paidInterest } = editCustomerForm;
-    const { data, error } = await supabase.from('loans').update({ borrowerName, note, phone, paidInterest }).eq('id', loanId).select();
+    const { borrowerName, note, phone, paidInterest, hasCollateral } = editCustomerForm;
+    const { data, error } = await supabase.from('loans').update({ borrowerName, note, phone, paidInterest, hasCollateral }).eq('id', loanId).select();
     if (!error) {
-      refreshLoans(loans.map(l => l.id === loanId ? { ...l, borrowerName, note, phone, paidInterest } : l));
+      refreshLoans(loans.map(l => l.id === loanId ? { ...l, borrowerName, note, phone, paidInterest, hasCollateral } : l));
       setEditCustomer(null);
     }
   };
@@ -215,20 +218,79 @@ const LoanTracker = ({ loans, refreshLoans }) => {
     let totalPaid = 0;
     let interestRate = loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST;
     let penaltyRate = loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY;
-    let periodStart = new Date(startDate);
-    let periodEnd = new Date(periodStart);
-    periodEnd.setDate(periodEnd.getDate() + 7);
     let penalty = 0;
     let interestDue = 0;
-    let nextPaymentDue = new Date(periodEnd);
+    let nextPaymentDue;
     let lastInterestPaidDate = null;
     let interestPaidThisPeriod = 0;
     let prepay = false;
+    let penaltyPaidThisWeek = 0;
+    const periodStart = new Date(startDate);
+    const periodEnd = new Date(periodStart);
+    periodEnd.setDate(periodEnd.getDate() + 7);
     const principalDueDate = new Date(startDate);
     principalDueDate.setHours(12,0,0,0);
     principalDueDate.setDate(principalDueDate.getDate() + 7);
     const sortedPayments = [...payments].sort((a, b) => new Date(a.date) - new Date(b.date));
-    let penaltyPaidThisWeek = 0;
+
+    // --- เงื่อนไขสำหรับลูกค้าไม่มีของค้ำประกัน ---
+    if (loan.hasCollateral === false) {
+      // 7 วันแรก: ดอกเบี้ย 20% ของเงินต้น (คิดครั้งเดียว)
+      const interest = loan.principal * 0.2;
+      let interestRemaining = interest;
+      let principalRemaining = loan.principal;
+      let paymentTotal = 0;
+      for (const payment of sortedPayments) {
+        paymentTotal += payment.amount;
+      }
+      let paymentLeft = paymentTotal;
+      // หักดอกเบี้ยก่อน
+      if (paymentLeft >= interestRemaining) {
+        paymentLeft -= interestRemaining;
+        interestRemaining = 0;
+      } else {
+        interestRemaining -= paymentLeft;
+        paymentLeft = 0;
+      }
+      // หักเงินต้น
+      if (paymentLeft > 0) {
+        principalRemaining = Math.max(0, principalRemaining - paymentLeft);
+      }
+      // ตรวจสอบวันปัจจุบันว่าเกิน 7 วันหรือยัง
+      const dueDate = new Date(startDate);
+      dueDate.setDate(dueDate.getDate() + 7);
+      let daysOverdue = 0;
+      if (today > dueDate) {
+        daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
+      }
+      // หลัง 7 วัน: คิดค่าปรับ 5% ต่อวันจากเงินต้นคงเหลือ
+      if (daysOverdue > 0 && principalRemaining > 0) {
+        penalty = principalRemaining * 0.05 * daysOverdue;
+      }
+      // interestDue คือดอกเบี้ยที่ยังไม่จ่าย (7 วันแรกเท่านั้น)
+      interestDue = interestRemaining;
+      currentPrincipal = principalRemaining;
+      nextPaymentDue = dueDate;
+      return {
+        currentPrincipal,
+        weeklyInterest: interest, // ดอกเบี้ย 7 วันแรก
+        interestDue: Math.max(0, interestDue),
+        interestPaidThisWeek: interest - interestRemaining,
+        penaltyPaidThisWeek: 0, // ไม่ track รายวัน
+        penalty,
+        totalDue: currentPrincipal + Math.max(0, interestDue) + penalty,
+        totalPaid: paymentTotal,
+        nextPaymentDue,
+        principalDueDate: dueDate,
+        isOverdue: today > dueDate && principalRemaining > 0,
+        daysOverdue: today > dueDate && principalRemaining > 0 ? daysOverdue : 0,
+        lastInterestPaymentDate: null,
+        interestRate: 0.2,
+        penaltyRate: 0.05
+      };
+    }
+    // --- เงื่อนไขเดิมสำหรับลูกค้ามีของค้ำประกัน ---
+    let periodInterest = currentPrincipal * interestRate;
     for (const payment of sortedPayments) {
       totalPaid += payment.amount;
       const paymentDate = new Date(payment.date);
@@ -236,11 +298,10 @@ const LoanTracker = ({ loans, refreshLoans }) => {
       // คำนวณ penalty ปัจจุบัน (ถ้ามี)
       let penaltyThisPayment = 0;
       let interestThisPayment = 0;
-      let periodInterest = currentPrincipal * interestRate;
       // กรณี overdue ให้คำนวณ penalty ก่อน
-      if (paymentDate > nextPaymentDue) {
+      if (paymentDate > periodEnd) {
         // จำนวนวันเกินกำหนด ณ วันที่จ่ายนี้
-        const daysOverdue = Math.ceil((paymentDate - nextPaymentDue) / (1000 * 60 * 60 * 24));
+        const daysOverdue = Math.ceil((paymentDate - periodEnd) / (1000 * 60 * 60 * 24));
         if (daysOverdue > 0) {
           penaltyThisPayment = currentPrincipal * penaltyRate * daysOverdue;
         }
@@ -268,7 +329,6 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
       }
     }
-    const periodInterest = currentPrincipal * interestRate;
     if (prepay) {
       nextPaymentDue = new Date(periodEnd);
       nextPaymentDue.setDate(nextPaymentDue.getDate() + 7);
@@ -413,6 +473,18 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                         className="form-checkbox h-5 w-5 text-green-600"
                       />
                       <span className="ml-2 text-sm text-gray-700">ตัดดอกแล้ว</span>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="inline-flex items-center mt-2">
+                      <input
+                        type="checkbox"
+                        checked={newLoan.hasCollateral}
+                        onChange={e => setNewLoan({ ...newLoan, hasCollateral: e.target.checked })}
+                        className="form-checkbox h-5 w-5 text-blue-600"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">มีของค้ำประกัน</span>
                     </label>
                   </div>
                   
@@ -644,6 +716,14 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                         <span className="text-green-700 text-lg font-bold">✅ จ่ายครบแล้ว! เงินกู้เสร็จสิ้น</span>
                       </div>
                     )}
+                    {/* เงื่อนไขพิเศษสำหรับลูกค้าไม่มีของค้ำ */}
+                    {selectedLoan.hasCollateral === false && (
+                      <div className="mb-4 p-3 bg-yellow-100 border border-yellow-400 rounded-lg flex items-center">
+                        <span className="text-yellow-800 text-base font-bold">
+                          ลูกค้ารายนี้ไม่มีของค้ำประกัน: 7 วันแรกคิดดอกเบี้ย 20% ของเงินต้น หลังจากนั้นคิดค่าปรับ 5% ต่อวันจากเงินต้นคงเหลือ
+                        </span>
+                      </div>
+                    )}
                     {/* Summary */}
                     <div className="bg-gray-50 rounded-xl p-4">
                       <h3 className="font-bold text-lg mb-3 text-gray-800">สรุปสถานะปัจจุบัน</h3>
@@ -657,7 +737,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                           <p className="font-bold text-lg">{formatCurrency(status.currentPrincipal)}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-600">ดอกเบี้ยสัปดาห์นี้</p>
+                          <p className="text-sm text-gray-600">{selectedLoan.hasCollateral === false ? 'ดอกเบี้ย 7 วันแรก' : 'ดอกเบี้ยสัปดาห์นี้'}</p>
                           <p className="font-bold text-lg text-blue-600">{formatCurrency(status.weeklyInterest)}</p>
                         </div>
                         <div>
@@ -702,6 +782,13 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                         </div>
                       )}
                       
+                      {selectedLoan.hasCollateral === false && status.penalty > 0 && (
+                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
+                          <p className="text-yellow-800 font-medium">
+                            * หมายเหตุ: ค่าปรับคิดจากเงินต้นคงเหลือ x 5% x จำนวนวันที่เกิน 7 วัน
+                          </p>
+                        </div>
+                      )}
                       {status.interestPaidThisWeek >= status.weeklyInterest && status.interestDue === 0 && (
                         <div className="mt-3 p-3 bg-blue-100 border border-blue-300 rounded-lg">
                           <p className="text-blue-800 font-medium">✅ ชำระดอกเบี้ยสัปดาห์นี้เรียบร้อยแล้ว</p>
@@ -838,6 +925,17 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                     <span className="ml-2 text-sm text-gray-700">ตัดดอกแล้ว</span>
                   </label>
                 </div>
+                <div>
+                  <label className="inline-flex items-center mt-2">
+                    <input
+                      type="checkbox"
+                      checked={editCustomerForm.hasCollateral}
+                      onChange={e => setEditCustomerForm({ ...editCustomerForm, hasCollateral: e.target.checked })}
+                      className="form-checkbox h-5 w-5 text-blue-600"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">มีของค้ำประกัน</span>
+                  </label>
+                </div>
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={() => saveEditCustomer(editCustomer)}
@@ -862,6 +960,11 @@ const LoanTracker = ({ loans, refreshLoans }) => {
             <div className="bg-white rounded-2xl p-8 w-full max-w-md relative">
               <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600" onClick={() => setShowBill(false)}><X size={24} /></button>
               <h2 className="text-2xl font-bold mb-4 text-center">ใบแจ้งหนี้/บิล</h2>
+              {selectedLoan.hasCollateral === false && (
+                <div className="mb-2 p-2 bg-yellow-100 border border-yellow-400 rounded text-yellow-800 text-center text-sm font-bold">
+                  ลูกค้าไม่มีของค้ำ: 7 วันแรกคิดดอกเบี้ย 20% หลังจากนั้นคิดค่าปรับ 5% ต่อวันจากเงินต้นคงเหลือ
+                </div>
+              )}
               <div className="mb-2 flex justify-between">
                 <span className="font-medium">กำหนดชำระ:</span>
                 <span>{formatDate(calculateCurrentStatus(selectedLoan).nextPaymentDue.toISOString().split('T')[0])}</span>
@@ -871,7 +974,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                 <span>{formatCurrency(calculateCurrentStatus(selectedLoan).currentPrincipal)}</span>
               </div>
               <div className="mb-2 flex justify-between">
-                <span className="font-medium">ดอกเบี้ย:</span>
+                <span className="font-medium">{selectedLoan.hasCollateral === false ? 'ดอกเบี้ย 7 วันแรก:' : 'ดอกเบี้ย:'}</span>
                 <span>{formatCurrency(calculateCurrentStatus(selectedLoan).interestDue)}{selectedLoan.paidInterest ? ' (หักดอกแล้ว)' : ''}</span>
               </div>
               <div className="mb-2 flex justify-between">

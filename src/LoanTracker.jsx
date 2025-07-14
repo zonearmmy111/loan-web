@@ -708,6 +708,13 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                     ออกบิล
                   </button>
                   <button
+                    className="bg-red-600 text-white px-2 py-1 rounded-lg font-bold hover:bg-red-700 transition-colors flex items-center"
+                    onClick={() => deleteLoan(selectedLoan.id)}
+                    title="ลบลูกค้ารายนี้"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                  <button
                     onClick={() => setSelectedLoan(null)}
                     className="text-gray-400 hover:text-gray-600 p-2"
                   >
@@ -970,11 +977,6 @@ const LoanTracker = ({ loans, refreshLoans }) => {
             <div className="bg-white rounded-2xl p-8 w-full max-w-md relative">
               <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600" onClick={() => setShowBill(false)}><X size={24} /></button>
               <h2 className="text-2xl font-bold mb-4 text-center">ใบแจ้งหนี้/บิล</h2>
-              {selectedLoan.hasCollateral === false && (
-                <div className="mb-2 p-2 bg-yellow-100 border border-yellow-400 rounded text-yellow-800 text-center text-sm font-bold">
-                  ลูกค้าไม่มีของค้ำ: 7 วันแรกคิดดอกเบี้ย 20% หลังจากนั้นคิดค่าปรับ 5% ต่อวันจากเงินต้นคงเหลือ
-                </div>
-              )}
               <div className="mb-2 flex justify-between">
                 <span className="font-medium">กำหนดชำระ:</span>
                 <span>{formatDate(calculateCurrentStatus(selectedLoan).nextPaymentDue.toISOString().split('T')[0])}</span>

@@ -893,7 +893,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                 <div>ชื่อ พยุงศักดิ์ ภานประดิษฐ</div>
               </div>
               <div className="flex justify-center mt-2">
-                <img src="/qr-payment.jpg" alt="QR Code" className="w-40 h-40 object-contain" />
+                <img src="/qr-payment.jpg" alt="QR Code" className="w-60 h-60 object-contain" />
               </div>
             </div>
           </div>

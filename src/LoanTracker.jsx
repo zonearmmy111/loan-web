@@ -200,10 +200,14 @@ const LoanTracker = ({ loans, refreshLoans }) => {
 
   const saveEditCustomer = async (loanId) => {
     const { borrowerName, note, phone, paidInterest, hasCollateral } = editCustomerForm;
+    console.log('saveEditCustomer', { loanId, borrowerName, note, phone, paidInterest, hasCollateral });
     const { data, error } = await supabase.from('loans').update({ borrowerName, note, phone, paidInterest, hasCollateral }).eq('id', loanId).select();
     if (!error) {
       refreshLoans(loans.map(l => l.id === loanId ? { ...l, borrowerName, note, phone, paidInterest, hasCollateral } : l));
       setEditCustomer(null);
+    } else {
+      alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
+      console.error('saveEditCustomer error', error);
     }
   };
 

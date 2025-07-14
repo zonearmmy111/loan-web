@@ -278,7 +278,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         interestDue = periodInterest;
         penalty = 0;
       } else if (today >= nextPaymentDue) {
-        const daysOverdue = Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
+        const daysOverdue = Math.ceil((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
         penalty = currentPrincipal * penaltyRate * daysOverdue;
         interestDue = periodInterest;
       }
@@ -291,14 +291,14 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         interestDue = periodInterest;
         penalty = 0;
       } else if (today >= nextPaymentDue) {
-        const daysOverdue = Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
+        const daysOverdue = Math.ceil((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
         penalty = currentPrincipal * penaltyRate * daysOverdue;
         interestDue = periodInterest;
       }
     } else {
       nextPaymentDue = new Date(principalDueDate);
       interestDue = today < principalDueDate ? 0 : periodInterest;
-      penalty = today < principalDueDate ? 0 : (today > principalDueDate ? currentPrincipal * penaltyRate * Math.floor((today - principalDueDate) / (1000 * 60 * 60 * 24)) : 0);
+      penalty = today < principalDueDate ? 0 : (today > principalDueDate ? currentPrincipal * penaltyRate * Math.ceil((today - principalDueDate) / (1000 * 60 * 60 * 24)) : 0);
     }
     return {
       currentPrincipal,
@@ -311,7 +311,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
       nextPaymentDue,
       principalDueDate,
       isOverdue: today > nextPaymentDue,
-      daysOverdue: today > nextPaymentDue ? Math.floor((today - nextPaymentDue) / (1000 * 60 * 60 * 24)) : 0,
+      daysOverdue: today > nextPaymentDue ? Math.ceil((today - nextPaymentDue) / (1000 * 60 * 60 * 24)) : 0,
       lastInterestPaymentDate: lastInterestPaidDate,
       interestRate,
       penaltyRate
@@ -508,7 +508,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                       </div>
                       {status.isOverdue && status.daysOverdue > 0 && (
                         <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium">
-                          เกินกำหนด {status.daysOverdue} วัน
+                          เกินกำหนด {status.daysOverdue} วัน (ค่าปรับ {status.penaltyRate * 100}% ของเงินต้นต่อวัน = {formatCurrency(status.currentPrincipal * status.penaltyRate)} /วัน รวม {formatCurrency(status.penalty)})
                         </span>
                       )}
                     </div>
@@ -722,7 +722,9 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                       
                       {status.isOverdue && status.daysOverdue > 0 && (
                         <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded-lg">
-                          <p className="text-red-800 font-medium">⚠️ เกินกำหนดชำระ {status.daysOverdue} วัน</p>
+                          <p className="text-red-800 font-medium">
+                            ⚠️ เกินกำหนดชำระ {status.daysOverdue} วัน (ค่าปรับ {status.penaltyRate * 100}% ของเงินต้นต่อวัน = {formatCurrency(status.currentPrincipal * status.penaltyRate)} /วัน รวม {formatCurrency(status.penalty)})
+                          </p>
                         </div>
                       )}
                       

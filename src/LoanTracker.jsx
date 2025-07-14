@@ -228,6 +228,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
     principalDueDate.setHours(12,0,0,0);
     principalDueDate.setDate(principalDueDate.getDate() + 7);
     const sortedPayments = [...payments].sort((a, b) => new Date(a.date) - new Date(b.date));
+    let penaltyPaidThisWeek = 0;
     for (const payment of sortedPayments) {
       totalPaid += payment.amount;
       const paymentDate = new Date(payment.date);
@@ -248,6 +249,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
       // 1. หักค่าปรับก่อน
       if (penaltyThisPayment > 0) {
         const payPenalty = Math.min(paymentLeft, penaltyThisPayment);
+        penaltyPaidThisWeek += payPenalty;
         paymentLeft -= payPenalty;
         penaltyThisPayment -= payPenalty;
       }
@@ -304,6 +306,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
       weeklyInterest: periodInterest,
       interestDue: Math.max(0, interestDue),
       interestPaidThisWeek: interestPaidThisPeriod,
+      penaltyPaidThisWeek,
       penalty,
       totalDue: currentPrincipal + Math.max(0, interestDue) + penalty,
       totalPaid,
@@ -659,7 +662,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">ดอกเบี้ยจ่ายแล้ว</p>
-                          <p className="font-bold text-lg text-green-600">{formatCurrency(status.interestPaidThisWeek)}</p>
+                          <p className="font-bold text-lg text-green-600">{formatCurrency(status.interestPaidThisWeek + (status.penaltyPaidThisWeek || 0))}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">ดอกเบี้ยค้างชำระ</p>
@@ -890,7 +893,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                 <div>ชื่อ พยุงศักดิ์ ภานประดิษฐ</div>
               </div>
               <div className="flex justify-center mt-2">
-                <img src="/qr-payment.png" alt="QR Code" className="w-40 h-40 object-contain" />
+                <img src="/qr-payment.jpg" alt="QR Code" className="w-40 h-40 object-contain" />
               </div>
             </div>
           </div>

@@ -117,18 +117,24 @@ const LoanTracker = ({ loans, refreshLoans }) => {
 
   // อัปเดตอัตราดอกเบี้ย/ค่าปรับ
   const saveRate = async () => {
-    // อัปเดตอัตราดอกเบี้ย/ค่าปรับกับ loan ทุก record (WHERE id != null)
-    const { error } = await supabase.from('loans').update({
-      interestRate: rateForm.interestRate === '' ? null : parseFloat(rateForm.interestRate),
-      penaltyRate: rateForm.penaltyRate === '' ? null : parseFloat(rateForm.penaltyRate),
-    }).neq('id', null); // Supabase/Postgres ต้องการ WHERE เสมอ
-    if (error) {
-      alert('บันทึกอัตราดอกเบี้ยผิดพลาด: ' + error.message);
-    } else {
-      setEditRateLoan(null);
-      setRateForm({ interestRate: '', penaltyRate: '' });
-      refreshLoans();
+    // 1. ดึง id loan ทุก record
+    const { data: allLoans, error: fetchError } = await supabase.from('loans').select('id');
+    if (fetchError) {
+      alert('เกิดข้อผิดพลาดในการดึงข้อมูล loan: ' + fetchError.message);
+      return;
     }
+    // 2. update ทุก record
+    const updates = allLoans.map(loan =>
+      supabase.from('loans').update({
+        interestRate: rateForm.interestRate === '' ? null : parseFloat(rateForm.interestRate),
+        penaltyRate: rateForm.penaltyRate === '' ? null : parseFloat(rateForm.penaltyRate),
+      }).eq('id', loan.id)
+    );
+    await Promise.all(updates);
+    // 3. refresh
+    setEditRateLoan(null);
+    setRateForm({ interestRate: '', penaltyRate: '' });
+    refreshLoans();
   };
 
   const formatCurrency = (amount) => {

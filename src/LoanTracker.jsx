@@ -274,8 +274,8 @@ const LoanTracker = ({ loans, refreshLoans }) => {
       if (daysOverdue > 0 && principalRemaining > 0) {
         penalty = principalRemaining * penaltyRate * daysOverdue;
       }
-      // interestDue คือดอกเบี้ยที่ยังไม่จ่าย (7 วันแรกเท่านั้น)
-      interestDue = interestRemaining;
+      // interestDue คือดอกเบี้ยที่ยังไม่จ่าย (7 วันแรกแสดงตั้งแต่วันแรกจนกว่าจะจ่ายครบ)
+      interestDue = interestRemaining === 0 ? 0 : interest;
       currentPrincipal = principalRemaining;
       nextPaymentDue = dueDate;
       return {

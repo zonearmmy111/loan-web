@@ -506,7 +506,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                           {loan.borrowerName}
                         </h3>
                       </div>
-                      {status.isOverdue && (
+                      {status.isOverdue && status.daysOverdue > 0 && (
                         <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium">
                           เกินกำหนด {status.daysOverdue} วัน
                         </span>
@@ -720,7 +720,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                         </div>
                       </div>
                       
-                      {status.isOverdue && (
+                      {status.isOverdue && status.daysOverdue > 0 && (
                         <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded-lg">
                           <p className="text-red-800 font-medium">⚠️ เกินกำหนดชำระ {status.daysOverdue} วัน</p>
                         </div>

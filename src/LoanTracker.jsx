@@ -985,7 +985,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
               </div>
               <div className="mb-2 flex justify-between">
                 <span className="font-medium">{selectedLoan.hasCollateral === false ? 'ดอกเบี้ย 7 วันแรก:' : 'ดอกเบี้ย:'}</span>
-                <span>{formatCurrency(calculateCurrentStatus(selectedLoan).interestDue)}{selectedLoan.paidInterest ? ' (หักดอกแล้ว)' : ''}</span>
+                <span>{formatCurrency(calculateCurrentStatus(selectedLoan).weeklyInterest)}{selectedLoan.paidInterest ? ' (หักดอกแล้ว)' : ''}</span>
               </div>
               <div className="mb-2 flex justify-between">
                 <span className="font-medium">ค่าปรับ:</span>

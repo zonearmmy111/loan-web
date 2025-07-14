@@ -117,11 +117,11 @@ const LoanTracker = ({ loans, refreshLoans }) => {
 
   // อัปเดตอัตราดอกเบี้ย/ค่าปรับ
   const saveRate = async () => {
-    if (!editRateLoan) return;
+    // อัปเดตอัตราดอกเบี้ย/ค่าปรับกับ loan ทุก record
     const { error } = await supabase.from('loans').update({
       interestRate: rateForm.interestRate === '' ? null : parseFloat(rateForm.interestRate),
       penaltyRate: rateForm.penaltyRate === '' ? null : parseFloat(rateForm.penaltyRate),
-    }).eq('id', editRateLoan.id);
+    }); // ไม่มี .eq('id', ...) เพื่อ update ทุก record
     if (error) {
       alert('บันทึกอัตราดอกเบี้ยผิดพลาด: ' + error.message);
     } else {

@@ -12,6 +12,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
   const [editRateLoan, setEditRateLoan] = useState(null);
   const [rateForm, setRateForm] = useState({ interestRate: '', penaltyRate: '' });
   const [activeTab, setActiveTab] = useState('active'); // 'active' หรือ 'paid'
+  const [showBill, setShowBill] = useState(false);
   
   const getLocalDateString = () => {
     const today = new Date();
@@ -517,24 +518,8 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                         <span className="font-medium text-blue-900">{formatCurrency(status.currentPrincipal)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">ดอกเบี้ยค้างชำระ:</span>
-                        <span className="font-medium text-orange-500">{formatCurrency(status.interestDue)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">ค่าปรับ:</span>
-                        <span className="font-medium text-red-500">{formatCurrency(status.penalty)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">เงินต้นที่ต้องจ่าย:</span>
-                        <span className="font-medium text-blue-900">{formatCurrency(0)}</span>
-                      </div>
-                      <div className="flex justify-between">
                         <span className="text-gray-600">ดอกเบี้ย+ค่าปรับที่ต้องจ่าย:</span>
                         <span className="font-medium text-orange-500">{formatCurrency(status.interestDue + status.penalty)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">ต้องจ่ายรวม:</span>
-                        <span className="font-extrabold text-pink-600 text-lg drop-shadow">{formatCurrency(status.totalDue)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">ครบกำหนดจ่ายดอกเบี้ย:</span>
@@ -547,20 +532,16 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                         <span className="text-gray-600">ครบกำหนดจ่ายเงินต้น:</span>
                         <span className="font-bold text-purple-600">{formatDate(status.principalDueDate.toISOString().split('T')[0])}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">วันที่กู้:</span>
-                        <span className="font-medium">{formatDate(loan.startDate)}</span>
-                      </div>
-                      {loan.note && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">หมายเหตุ:</span>
-                          <span className="font-medium">{loan.note}</span>
-                        </div>
-                      )}
                       {loan.phone && (
                         <div className="flex justify-between">
                           <span className="text-gray-600">ช่องทางการติดต่อ:</span>
                           <span className="font-medium">{loan.phone}</span>
+                        </div>
+                      )}
+                      {loan.note && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">หมายเหตุ:</span>
+                          <span className="font-medium">{loan.note}</span>
                         </div>
                       )}
                     </div>
@@ -691,10 +672,6 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                         <div>
                           <p className="text-sm text-gray-600">ค่าปรับ</p>
                           <p className="font-bold text-lg text-red-600">{formatCurrency(status.penalty)}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">เงินต้นที่ต้องจ่าย</p>
-                          <p className="font-bold text-lg">{formatCurrency(0)}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">ดอกเบี้ย+ค่าปรับที่ต้องจ่าย</p>
@@ -876,6 +853,48 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                     ยกเลิก
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showBill && selectedLoan && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-8 w-full max-w-md relative">
+              <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600" onClick={() => setShowBill(false)}><X size={24} /></button>
+              <h2 className="text-2xl font-bold mb-4 text-center">ใบแจ้งหนี้/บิล</h2>
+              <div className="mb-2 flex justify-between">
+                <span className="font-medium">กำหนดชำระ:</span>
+                <span>{formatDate(calculateCurrentStatus(selectedLoan).nextPaymentDue.toISOString().split('T')[0])}</span>
+              </div>
+              <div className="mb-2 flex justify-between">
+                <span className="font-medium">เงินต้น:</span>
+                <span>{formatCurrency(calculateCurrentStatus(selectedLoan).currentPrincipal)}</span>
+              </div>
+              <div className="mb-2 flex justify-between">
+                <span className="font-medium">ดอกเบี้ย:</span>
+                <span>{formatCurrency(calculateCurrentStatus(selectedLoan).interestDue)}{selectedLoan.paidInterest ? ' (หักดอกแล้ว)' : ''}</span>
+              </div>
+              <div className="mb-2 flex justify-between">
+                <span className="font-medium">ค่าปรับ:</span>
+                <span>{formatCurrency(calculateCurrentStatus(selectedLoan).penalty)}</span>
+              </div>
+              <div className="mb-2 flex justify-between border-t pt-2">
+                <span className="font-bold">รวม:</span>
+                <span className="font-bold text-pink-600">
+                  {selectedLoan.paidInterest
+                    ? formatCurrency(calculateCurrentStatus(selectedLoan).currentPrincipal + calculateCurrentStatus(selectedLoan).penalty)
+                    : formatCurrency(calculateCurrentStatus(selectedLoan).currentPrincipal + calculateCurrentStatus(selectedLoan).interestDue + calculateCurrentStatus(selectedLoan).penalty)
+                  }
+                </span>
+              </div>
+              <div className="mt-4 mb-2">
+                <div className="font-medium mb-1">ช่องทางการจ่ายเงิน:</div>
+                <div>ธนาคาร กสิกรไทย เลขที่บัญชี 0693795338</div>
+                <div>ชื่อ พยุงศักดิ์ ภานประดิษฐ</div>
+              </div>
+              <div className="flex justify-center mt-2">
+                <img src="/qr-payment.png" alt="QR Code" className="w-40 h-40 object-contain" />
               </div>
             </div>
           </div>

@@ -996,7 +996,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                 <span className="font-bold text-pink-600">
                   {selectedLoan.paidInterest
                     ? formatCurrency(calculateCurrentStatus(selectedLoan).currentPrincipal + calculateCurrentStatus(selectedLoan).penalty)
-                    : formatCurrency(calculateCurrentStatus(selectedLoan).currentPrincipal + calculateCurrentStatus(selectedLoan).interestDue + calculateCurrentStatus(selectedLoan).penalty)
+                    : formatCurrency(calculateCurrentStatus(selectedLoan).currentPrincipal + calculateCurrentStatus(selectedLoan).weeklyInterest + calculateCurrentStatus(selectedLoan).penalty)
                   }
                 </span>
               </div>

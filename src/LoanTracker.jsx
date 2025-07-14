@@ -239,8 +239,11 @@ const LoanTracker = ({ loans, refreshLoans }) => {
 
     // --- เงื่อนไขสำหรับลูกค้าไม่มีของค้ำประกัน ---
     if (loan.hasCollateral === false) {
-      // 7 วันแรก: ดอกเบี้ย 20% ของเงินต้น (คิดครั้งเดียว)
-      const interest = loan.principal * 0.2;
+      // ใช้อัตราดอกเบี้ย/ค่าปรับจาก loan หรือ default
+      const interestRate = loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST;
+      const penaltyRate = loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY;
+      // 7 วันแรก: ดอกเบี้ยตามอัตรา
+      const interest = loan.principal * interestRate;
       let interestRemaining = interest;
       let principalRemaining = loan.principal;
       let paymentTotal = 0;
@@ -267,9 +270,9 @@ const LoanTracker = ({ loans, refreshLoans }) => {
       if (today > dueDate) {
         daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
       }
-      // หลัง 7 วัน: คิดค่าปรับ 5% ต่อวันจากเงินต้นคงเหลือ
+      // หลัง 7 วัน: คิดค่าปรับตามอัตรา
       if (daysOverdue > 0 && principalRemaining > 0) {
-        penalty = principalRemaining * 0.05 * daysOverdue;
+        penalty = principalRemaining * penaltyRate * daysOverdue;
       }
       // interestDue คือดอกเบี้ยที่ยังไม่จ่าย (7 วันแรกเท่านั้น)
       interestDue = interestRemaining;
@@ -289,8 +292,8 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         isOverdue: today > dueDate && principalRemaining > 0,
         daysOverdue: today > dueDate && principalRemaining > 0 ? daysOverdue : 0,
         lastInterestPaymentDate: null,
-        interestRate: 0.2,
-        penaltyRate: 0.05
+        interestRate,
+        penaltyRate
       };
     }
     // --- เงื่อนไขเดิมสำหรับลูกค้ามีของค้ำประกัน ---

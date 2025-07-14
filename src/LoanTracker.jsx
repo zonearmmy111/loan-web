@@ -297,7 +297,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
       };
     }
     // --- เงื่อนไขเดิมสำหรับลูกค้ามีของค้ำประกัน ---
-    let periodInterest = currentPrincipal * interestRate;
+    // ให้คำนวณ periodInterest (ดอกเบี้ยรอบถัดไป) จาก currentPrincipal ที่ถูกหักเงินจ่ายแล้ว
     for (const payment of sortedPayments) {
       totalPaid += payment.amount;
       const paymentDate = new Date(payment.date);
@@ -322,6 +322,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         penaltyThisPayment -= payPenalty;
       }
       // 2. หักดอกเบี้ย
+      let periodInterest = currentPrincipal * interestRate; // ใช้ currentPrincipal ล่าสุด
       if (interestPaidThisPeriod < periodInterest) {
         const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
         interestPaidThisPeriod += payInterest;
@@ -336,6 +337,8 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
       }
     }
+    // ดอกเบี้ยรอบถัดไปต้องใช้ currentPrincipal ล่าสุด
+    let periodInterest = currentPrincipal * interestRate;
     if (prepay) {
       nextPaymentDue = new Date(periodEnd);
       nextPaymentDue.setDate(nextPaymentDue.getDate() + 7);

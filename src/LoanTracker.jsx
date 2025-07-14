@@ -231,40 +231,38 @@ const LoanTracker = ({ loans, refreshLoans }) => {
       totalPaid += payment.amount;
       const paymentDate = new Date(payment.date);
       paymentDate.setHours(0,0,0,0);
-      if (paymentDate < periodEnd) {
-        const periodInterest = currentPrincipal * interestRate;
-        let paymentLeft = payment.amount;
-        if (interestPaidThisPeriod < periodInterest) {
-          const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
-          interestPaidThisPeriod += payInterest;
-          paymentLeft -= payInterest;
-          if (interestPaidThisPeriod >= periodInterest) {
-            lastInterestPaidDate = paymentDate;
-            prepay = true;
-          }
+      // คำนวณ penalty ปัจจุบัน (ถ้ามี)
+      let penaltyThisPayment = 0;
+      let interestThisPayment = 0;
+      let periodInterest = currentPrincipal * interestRate;
+      // กรณี overdue ให้คำนวณ penalty ก่อน
+      if (paymentDate > nextPaymentDue) {
+        // จำนวนวันเกินกำหนด ณ วันที่จ่ายนี้
+        const daysOverdue = Math.ceil((paymentDate - nextPaymentDue) / (1000 * 60 * 60 * 24));
+        if (daysOverdue > 0) {
+          penaltyThisPayment = currentPrincipal * penaltyRate * daysOverdue;
         }
-        if (paymentLeft > 0) {
-          currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
+      }
+      let paymentLeft = payment.amount;
+      // 1. หักค่าปรับก่อน
+      if (penaltyThisPayment > 0) {
+        const payPenalty = Math.min(paymentLeft, penaltyThisPayment);
+        paymentLeft -= payPenalty;
+        penaltyThisPayment -= payPenalty;
+      }
+      // 2. หักดอกเบี้ย
+      if (interestPaidThisPeriod < periodInterest) {
+        const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
+        interestPaidThisPeriod += payInterest;
+        paymentLeft -= payInterest;
+        if (interestPaidThisPeriod >= periodInterest) {
+          lastInterestPaidDate = paymentDate;
+          prepay = true;
         }
-      } else {
-        const periodInterest = currentPrincipal * interestRate;
-        let paymentLeft = payment.amount;
-        if (interestPaidThisPeriod < periodInterest) {
-          const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
-          interestPaidThisPeriod += payInterest;
-          paymentLeft -= payInterest;
-          if (interestPaidThisPeriod >= periodInterest) {
-            lastInterestPaidDate = paymentDate;
-            periodStart = new Date(paymentDate);
-            periodEnd = new Date(periodStart);
-            periodEnd.setDate(periodEnd.getDate() + 7);
-            interestPaidThisPeriod = 0;
-            prepay = false;
-          }
-        }
-        if (paymentLeft > 0) {
-          currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
-        }
+      }
+      // 3. หักเงินต้น
+      if (paymentLeft > 0) {
+        currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
       }
     }
     const periodInterest = currentPrincipal * interestRate;

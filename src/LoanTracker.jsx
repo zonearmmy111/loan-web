@@ -117,11 +117,11 @@ const LoanTracker = ({ loans, refreshLoans }) => {
 
   // อัปเดตอัตราดอกเบี้ย/ค่าปรับ
   const saveRate = async () => {
-    // อัปเดตอัตราดอกเบี้ย/ค่าปรับกับ loan ทุก record
+    // อัปเดตอัตราดอกเบี้ย/ค่าปรับกับ loan ทุก record (WHERE id != null)
     const { error } = await supabase.from('loans').update({
       interestRate: rateForm.interestRate === '' ? null : parseFloat(rateForm.interestRate),
       penaltyRate: rateForm.penaltyRate === '' ? null : parseFloat(rateForm.penaltyRate),
-    }); // ไม่มี .eq('id', ...) เพื่อ update ทุก record
+    }).neq('id', null); // Supabase/Postgres ต้องการ WHERE เสมอ
     if (error) {
       alert('บันทึกอัตราดอกเบี้ยผิดพลาด: ' + error.message);
     } else {

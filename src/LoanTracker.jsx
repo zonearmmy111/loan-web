@@ -737,7 +737,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                     {selectedLoan.hasCollateral === false && (
                       <div className="mb-4 p-3 bg-yellow-100 border border-yellow-400 rounded-lg flex items-center">
                         <span className="text-yellow-800 text-base font-bold">
-                          ลูกค้ารายนี้ไม่มีของค้ำประกัน: 7 วันแรกคิดดอกเบี้ย 20% ของเงินต้น หลังจากนั้นคิดค่าปรับ 5% ต่อวันจากเงินต้นคงเหลือ
+                          ลูกค้ารายนี้ไม่มีของค้ำประกัน: 7 วันแรกคิดดอกเบี้ย {status.interestRate * 100}% ของเงินต้น หลังจากนั้นคิดค่าปรับ {status.penaltyRate * 100}% ต่อวันจากเงินต้นคงเหลือ
                         </span>
                       </div>
                     )}
@@ -802,7 +802,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                       {selectedLoan.hasCollateral === false && status.penalty > 0 && (
                         <div className="mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
                           <p className="text-yellow-800 font-medium">
-                            * หมายเหตุ: ค่าปรับคิดจากเงินต้นคงเหลือ x 5% x จำนวนวันที่เกิน 7 วัน
+                            * หมายเหตุ: ค่าปรับคิดจากเงินต้นคงเหลือ x {status.penaltyRate * 100}% x จำนวนวันที่เกิน 7 วัน
                           </p>
                         </div>
                       )}

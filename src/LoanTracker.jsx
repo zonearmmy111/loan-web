@@ -1002,6 +1002,9 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                   }
                 </span>
               </div>
+              <div className="text-xs text-yellow-700 mt-2 mb-2 font-medium">
+                * หมายเหตุ: หากจ่ายเกินกำหนด จะคิดค่าปรับวันละ 5% ของเงินต้นคงเหลือ
+              </div>
               <div className="mt-4 mb-2">
                 <div className="font-medium mb-1">ช่องทางการจ่ายเงิน:</div>
                 <div>ธนาคาร กสิกรไทย เลขที่บัญชี 0693795338</div>

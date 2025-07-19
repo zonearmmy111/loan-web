@@ -340,7 +340,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
     // ดอกเบี้ยรอบถัดไปต้องใช้ currentPrincipal ล่าสุด
     let periodInterest = currentPrincipal * interestRate;
     if (prepay) {
-      nextPaymentDue = new Date(periodEnd);
+      nextPaymentDue = new Date(lastInterestPaidDate);
       nextPaymentDue.setDate(nextPaymentDue.getDate() + 7);
       if (today < periodEnd) {
         interestDue = 0;
@@ -1003,7 +1003,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                 </span>
               </div>
               <div className="text-xs text-yellow-700 mt-2 mb-2 font-medium">
-                * หมายเหตุ: หากจ่ายเกินกำหนด จะคิดค่าปรับวันละ 5% ของเงินต้นคงเหลือ
+                {`* หมายเหตุ: หากจ่ายเกินกำหนด จะคิดค่าปรับวันละ ${((calculateCurrentStatus(selectedLoan).penaltyRate || 0) * 100).toFixed(2).replace(/\.00$/, '')}% ของเงินต้นคงเหลือ`}
               </div>
               <div className="mt-4 mb-2">
                 <div className="font-medium mb-1">ช่องทางการจ่ายเงิน:</div>

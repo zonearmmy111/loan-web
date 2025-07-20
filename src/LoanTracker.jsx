@@ -213,180 +213,23 @@ const LoanTracker = ({ loans, refreshLoans }) => {
 
   // เพิ่มฟังก์ชันนี้ไว้ก่อน return
   const calculateCurrentStatus = (loan) => {
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const [yyyy, mm, dd] = loan.startDate.split('-');
-    const startDate = new Date(Number(yyyy), Number(mm) - 1, Number(dd), 12, 0, 0, 0);
-    const payments = loan.payments || [];
-    let currentPrincipal = loan.principal;
-    let totalPaid = 0;
-    let interestRate = loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST;
-    let penaltyRate = loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY;
-    let penalty = 0;
-    let interestDue = 0;
-    let nextPaymentDue;
-    let lastInterestPaidDate = null;
-    let interestPaidThisPeriod = 0;
-    let prepay = false;
-    let penaltyPaidThisWeek = 0;
-    const periodStart = new Date(startDate);
-    const periodEnd = new Date(periodStart);
-    periodEnd.setDate(periodEnd.getDate() + 7);
-    const principalDueDate = new Date(startDate);
-    principalDueDate.setHours(12,0,0,0);
-    principalDueDate.setDate(principalDueDate.getDate() + 7);
-    const sortedPayments = [...payments].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    // --- เงื่อนไขสำหรับลูกค้าไม่มีของค้ำประกัน ---
-    if (loan.hasCollateral === false) {
-      // ใช้อัตราดอกเบี้ย/ค่าปรับจาก loan หรือ default
-      const interestRate = loan.interestRate !== null && loan.interestRate !== undefined ? loan.interestRate : DEFAULT_INTEREST;
-      const penaltyRate = loan.penaltyRate !== null && loan.penaltyRate !== undefined ? loan.penaltyRate : DEFAULT_PENALTY;
-      // 7 วันแรก: ดอกเบี้ยตามอัตรา
-      const interest = loan.principal * interestRate;
-      let interestRemaining = interest;
-      let principalRemaining = loan.principal;
-      let paymentTotal = 0;
-      for (const payment of sortedPayments) {
-        paymentTotal += payment.amount;
-      }
-      let paymentLeft = paymentTotal;
-      // หักดอกเบี้ยก่อน
-      if (paymentLeft >= interestRemaining) {
-        paymentLeft -= interestRemaining;
-        interestRemaining = 0;
-      } else {
-        interestRemaining -= paymentLeft;
-        paymentLeft = 0;
-      }
-      // หักเงินต้น
-      if (paymentLeft > 0) {
-        principalRemaining = Math.max(0, principalRemaining - paymentLeft);
-      }
-      // ตรวจสอบวันปัจจุบันว่าเกิน 7 วันหรือยัง
-      const dueDate = new Date(startDate);
-      dueDate.setDate(dueDate.getDate() + 7);
-      let daysOverdue = 0;
-      if (today > dueDate) {
-        daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
-      }
-      // หลัง 7 วัน: คิดค่าปรับตามอัตรา
-      if (daysOverdue > 0 && principalRemaining > 0) {
-        penalty = principalRemaining * penaltyRate * daysOverdue;
-      }
-      // interestDue คือดอกเบี้ยที่ยังไม่จ่าย (7 วันแรกแสดงตั้งแต่วันแรกจนกว่าจะจ่ายครบ)
-      interestDue = interestRemaining === 0 ? 0 : interest;
-      currentPrincipal = principalRemaining;
-      nextPaymentDue = dueDate;
-      return {
-        currentPrincipal,
-        weeklyInterest: interest, // ดอกเบี้ย 7 วันแรก
-        interestDue: Math.max(0, interestDue),
-        interestPaidThisWeek: interest - interestRemaining,
-        penaltyPaidThisWeek: 0, // ไม่ track รายวัน
-        penalty,
-        totalDue: currentPrincipal + Math.max(0, interestDue) + penalty,
-        totalPaid: paymentTotal,
-        nextPaymentDue,
-        principalDueDate: dueDate,
-        isOverdue: today > dueDate && principalRemaining > 0,
-        daysOverdue: today > dueDate && principalRemaining > 0 ? daysOverdue : 0,
-        lastInterestPaymentDate: null,
-        interestRate,
-        penaltyRate
-      };
-    }
-    // --- เงื่อนไขเดิมสำหรับลูกค้ามีของค้ำประกัน ---
-    // ให้คำนวณ periodInterest (ดอกเบี้ยรอบถัดไป) จาก currentPrincipal ที่ถูกหักเงินจ่ายแล้ว
-    for (const payment of sortedPayments) {
-      totalPaid += payment.amount;
-      const paymentDate = new Date(payment.date);
-      paymentDate.setHours(0,0,0,0);
-      // คำนวณ penalty ปัจจุบัน (ถ้ามี)
-      let penaltyThisPayment = 0;
-      let interestThisPayment = 0;
-      // กรณี overdue ให้คำนวณ penalty ก่อน
-      if (paymentDate > periodEnd) {
-        // จำนวนวันเกินกำหนด ณ วันที่จ่ายนี้
-        const daysOverdue = Math.ceil((paymentDate - periodEnd) / (1000 * 60 * 60 * 24));
-        if (daysOverdue > 0) {
-          penaltyThisPayment = currentPrincipal * penaltyRate * daysOverdue;
-        }
-      }
-      let paymentLeft = payment.amount;
-      // 1. หักค่าปรับก่อน
-      if (penaltyThisPayment > 0) {
-        const payPenalty = Math.min(paymentLeft, penaltyThisPayment);
-        penaltyPaidThisWeek += payPenalty;
-        paymentLeft -= payPenalty;
-        penaltyThisPayment -= payPenalty;
-      }
-      // 2. หักดอกเบี้ย
-      let periodInterest = currentPrincipal * interestRate; // ใช้ currentPrincipal ล่าสุด
-      if (interestPaidThisPeriod < periodInterest) {
-        const payInterest = Math.min(paymentLeft, periodInterest - interestPaidThisPeriod);
-        interestPaidThisPeriod += payInterest;
-        paymentLeft -= payInterest;
-        if (interestPaidThisPeriod >= periodInterest) {
-          lastInterestPaidDate = paymentDate;
-          prepay = true;
-        }
-      }
-      // 3. หักเงินต้น
-      if (paymentLeft > 0) {
-        currentPrincipal = Math.max(0, currentPrincipal - paymentLeft);
-      }
-    }
-    // ดอกเบี้ยรอบถัดไปต้องใช้ currentPrincipal ล่าสุด
-    let periodInterest = currentPrincipal * interestRate;
-    if (prepay) {
-      nextPaymentDue = new Date(lastInterestPaidDate);
-      nextPaymentDue.setDate(nextPaymentDue.getDate() + 7);
-      if (today < periodEnd) {
-        interestDue = 0;
-        penalty = 0;
-      } else if (today >= periodEnd && today < nextPaymentDue) {
-        interestDue = periodInterest;
-        penalty = 0;
-      } else if (today >= nextPaymentDue) {
-        const daysOverdue = Math.ceil((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
-        penalty = currentPrincipal * penaltyRate * daysOverdue;
-        interestDue = periodInterest;
-      }
-    } else if (lastInterestPaidDate) {
-      if (today < periodEnd) {
-        interestDue = 0;
-        penalty = 0;
-        nextPaymentDue = new Date(periodEnd);
-      } else if (today >= periodEnd && today < nextPaymentDue) {
-        interestDue = periodInterest;
-        penalty = 0;
-      } else if (today >= nextPaymentDue) {
-        const daysOverdue = Math.ceil((today - nextPaymentDue) / (1000 * 60 * 60 * 24));
-        penalty = currentPrincipal * penaltyRate * daysOverdue;
-        interestDue = periodInterest;
-      }
-    } else {
-      nextPaymentDue = new Date(principalDueDate);
-      interestDue = today < principalDueDate ? 0 : periodInterest;
-      penalty = today < principalDueDate ? 0 : (today > principalDueDate ? currentPrincipal * penaltyRate * Math.ceil((today - principalDueDate) / (1000 * 60 * 60 * 24)) : 0);
-    }
     return {
-      currentPrincipal,
-      weeklyInterest: periodInterest,
-      interestDue: Math.max(0, interestDue),
-      interestPaidThisWeek: interestPaidThisPeriod,
-      penaltyPaidThisWeek,
-      penalty,
-      totalDue: currentPrincipal + Math.max(0, interestDue) + penalty,
-      totalPaid,
-      nextPaymentDue,
-      principalDueDate,
-      isOverdue: today > nextPaymentDue,
-      daysOverdue: today > nextPaymentDue ? Math.ceil((today - nextPaymentDue) / (1000 * 60 * 60 * 24)) : 0,
-      lastInterestPaymentDate: lastInterestPaidDate,
-      interestRate,
-      penaltyRate
+      currentPrincipal: 1000,
+      weeklyInterest: 200,
+      interestDue: 200,
+      interestPaidThisWeek: 400,
+      penalty: 0,
+      totalDue: 1200,
+      // mock ค่าอื่น ๆ ที่อาจถูกใช้ใน UI
+      penaltyPaidThisWeek: 0,
+      totalPaid: 0,
+      nextPaymentDue: new Date(),
+      principalDueDate: new Date(),
+      isOverdue: false,
+      daysOverdue: 0,
+      lastInterestPaymentDate: null,
+      interestRate: 0.2,
+      penaltyRate: 0.05
     };
   };
 

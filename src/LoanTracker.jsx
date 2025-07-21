@@ -47,6 +47,82 @@ const LoanTracker = ({ loans, refreshLoans }) => {
   // เพิ่ม state สำหรับ currentDate (เวลาที่แสดงด้านบน)
   const [currentDate, setCurrentDate] = useState(new Date());
 
+  // เพิ่ม state สำหรับ modal รายละเอียดการหักเงิน
+  const [showPaymentDetail, setShowPaymentDetail] = useState(null);
+  const [paymentBreakdown, setPaymentBreakdown] = useState(null);
+
+  // ฟังก์ชันคำนวณ breakdown ของแต่ละ payment
+  function getPaymentBreakdown(loan, payment) {
+    // จำลองการคำนวณเหมือนใน calculateCurrentStatus แต่หยุดที่ payment นี้
+    const principal = loan.principal || 0;
+    const interestRate = loan.interestRate ?? 0.2;
+    const penaltyRate = loan.penaltyRate ?? 0.05;
+    const startDate = new Date(loan.startDate);
+    const payments = (loan.payments || []).map(p => ({ ...p, date: new Date(p.date) })).sort((a, b) => a.date - b.date);
+    let currentPrincipal = principal;
+    let periodStart = new Date(startDate);
+    let periodEnd = new Date(periodStart);
+    periodEnd.setDate(periodEnd.getDate() + 7);
+    let paymentIdx = 0;
+    let found = false;
+    let breakdown = { amount: payment.amount, penalty: 0, interest: 0, principal: 0 };
+    while (!found && paymentIdx < payments.length) {
+      let periodPenalty = 0;
+      let periodInterest = currentPrincipal * interestRate;
+      let periodInterestDue = periodInterest;
+      let periodPayments = [];
+      while (paymentIdx < payments.length && payments[paymentIdx].date <= periodEnd) {
+        periodPayments.push(payments[paymentIdx]);
+        paymentIdx++;
+      }
+      for (const pay of periodPayments) {
+        let paymentLeft = pay.amount;
+        // ค่าปรับ
+        let lateDays = 0;
+        if (pay.date > periodEnd) {
+          const due = new Date(periodEnd);
+          const paid = new Date(pay.date);
+          due.setHours(0,0,0,0);
+          paid.setHours(0,0,0,0);
+          lateDays = Math.max(0, Math.round((paid - due) / (1000 * 60 * 60 * 24)));
+          if (lateDays > 0) {
+            periodPenalty = currentPrincipal * penaltyRate * lateDays;
+            let payPenalty = Math.min(paymentLeft, periodPenalty);
+            if (pay.id === payment.id) breakdown.penalty = payPenalty;
+            paymentLeft -= payPenalty;
+          }
+        }
+        // ดอกเบี้ย
+        let payInterest = Math.min(paymentLeft, periodInterestDue);
+        if (pay.id === payment.id) breakdown.interest = payInterest;
+        paymentLeft -= payInterest;
+        periodInterestDue -= payInterest;
+        // เงินต้น
+        if (paymentLeft > 0) {
+          let payPrincipal = Math.min(paymentLeft, currentPrincipal);
+          if (pay.id === payment.id) breakdown.principal = payPrincipal;
+          currentPrincipal -= payPrincipal;
+          paymentLeft -= payPrincipal;
+        }
+        if (pay.id === payment.id) {
+          found = true;
+          break;
+        }
+        if (periodInterestDue === 0) {
+          periodStart = new Date(periodEnd);
+          periodEnd = new Date(periodStart);
+          periodEnd.setDate(periodEnd.getDate() + 7);
+        }
+      }
+      if (!found) {
+        periodStart = new Date(periodEnd);
+        periodEnd = new Date(periodStart);
+        periodEnd.setDate(periodEnd.getDate() + 7);
+      }
+    }
+    return breakdown;
+  }
+
   // โหลดข้อมูล loans จาก Supabase
   useEffect(() => {
     const fetchLoans = async () => {
@@ -696,6 +772,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                                     <p className="text-sm text-gray-600">{formatDate(payment.date)}</p>
                                   </div>
                                   <div className="flex gap-2">
+                                    <button onClick={() => { setShowPaymentDetail(payment); setPaymentBreakdown(getPaymentBreakdown(selectedLoan, payment)); }} className="text-blue-600 hover:text-blue-800" title="รายละเอียด">รายละเอียด</button>
                                     <button onClick={() => startEditPayment(payment)} className="text-yellow-600 hover:text-yellow-800" title="แก้ไข"><Edit2 size={16} /></button>
                                     <button onClick={() => deletePayment(selectedLoan.id, payment.id)} className="text-red-600 hover:text-red-800" title="ลบ"><Trash2 size={16} /></button>
                                   </div>

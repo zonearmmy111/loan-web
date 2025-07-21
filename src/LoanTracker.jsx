@@ -265,6 +265,15 @@ const LoanTracker = ({ loans, refreshLoans }) => {
       console.log('PeriodPayments:', periodPayments);
       // ถ้าไม่มี payment ในรอบนี้ และเลย periodEnd ให้คิดค่าปรับถึงวันนี้เท่านั้น
       if (periodPayments.length === 0 && today > periodEnd) {
+        // ตรวจสอบว่ามี payment หลังครบกำหนดหรือไม่
+        if (paymentIdx < payments.length && payments[paymentIdx].date > periodEnd) {
+          // มี payment หลังครบกำหนด ให้ขยับ periodStart/periodEnd ไปยังรอบถัดไป แล้ววน loop ต่อ
+          periodStart = new Date(periodEnd);
+          periodEnd = new Date(periodStart);
+          periodEnd.setDate(periodEnd.getDate() + 7);
+          continue;
+        }
+        // ไม่มี payment หลังครบกำหนด ให้คิดค่าปรับถึงวันนี้ (กรณีไม่มีการจ่ายเลย)
         let lateDays = Math.max(0, Math.floor((today - periodEnd) / (1000 * 60 * 60 * 24)));
         isOverdue = lateDays > 0;
         daysOverdue = lateDays;
@@ -272,15 +281,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         penalty += periodPenalty;
         interestDue += periodInterest;
         hadPenalty = hadPenalty || (lateDays > 0);
-        // DEBUG LOG: ไม่มี payment ในรอบนี้และเลยกำหนด
-        console.log('No payment in this period. LateDays:', lateDays, 'Penalty:', periodPenalty, 'InterestDue:', periodInterest);
-        if (paymentIdx >= payments.length || payments[paymentIdx].date <= periodEnd) {
-          break;
-        }
-        periodStart = new Date(periodEnd);
-        periodEnd = new Date(periodStart);
-        periodEnd.setDate(periodEnd.getDate() + 7);
-        continue;
+        break;
       }
       // ถ้ามี payment ในรอบนี้
       let paidThisPeriod = false;
@@ -288,8 +289,9 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         let paymentLeft = payment.amount;
         totalPaid += payment.amount;
         // ถ้าจ่ายหลัง periodEnd ให้คิดค่าปรับเฉพาะวันที่ยังไม่จ่ายดอกเบี้ย (คิดจากวันครบกำหนดถึงวันจ่ายจริงเท่านั้น)
+        let lateDays = 0;
         if (payment.date > periodEnd) {
-          let lateDays = Math.max(0, Math.floor((payment.date - periodEnd) / (1000 * 60 * 60 * 24)));
+          lateDays = Math.max(0, Math.floor((payment.date - periodEnd) / (1000 * 60 * 60 * 24)));
           if (lateDays > 0) {
             periodPenalty = currentPrincipal * penaltyRate * lateDays;
             let payPenalty = Math.min(paymentLeft, periodPenalty);
@@ -301,8 +303,6 @@ const LoanTracker = ({ loans, refreshLoans }) => {
             // ปรับปรุงให้ daysOverdue แสดงจำนวนวันที่จ่ายช้า (ถ้าเป็นรอบล่าสุด)
             daysOverdue = lateDays;
             isOverdue = true;
-            // DEBUG LOG: จ่ายหลังครบกำหนด
-            console.log('Payment after due. PaymentDate:', payment.date, 'LateDays:', lateDays, 'Penalty:', periodPenalty, 'PayPenalty:', payPenalty, 'PaymentLeft:', paymentLeft);
           }
         }
         // หักดอกเบี้ย
@@ -311,15 +311,11 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         interestPaid += payInterest;
         paymentLeft -= payInterest;
         periodInterestDue -= payInterest;
-        // DEBUG LOG: หักดอกเบี้ย
-        console.log('PayInterest:', payInterest, 'PaymentLeft:', paymentLeft, 'InterestDueAfter:', periodInterestDue);
         // หักเงินต้น
         if (paymentLeft > 0) {
           let payPrincipal = Math.min(paymentLeft, currentPrincipal);
           currentPrincipal -= payPrincipal;
           paymentLeft -= payPrincipal;
-          // DEBUG LOG: หักเงินต้น
-          console.log('PayPrincipal:', payPrincipal, 'CurrentPrincipalAfter:', currentPrincipal, 'PaymentLeft:', paymentLeft);
         }
         if (periodInterestDue === 0 && periodPenalty - penaltyPaidThisPeriod <= 0) {
           paidAllInterest = true;
@@ -341,8 +337,6 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         periodEnd = new Date(periodStart);
         periodEnd.setDate(periodEnd.getDate() + 7);
         hadPenalty = false;
-        // DEBUG LOG: reset รอบใหม่หลังจ่ายครบค่าปรับ+ดอกเบี้ย
-        console.log('Reset period after full payment (with penalty). NewPeriodStart:', periodStart, 'NewPeriodEnd:', periodEnd);
         continue;
       }
       // ถ้าจ่ายครบดอกเบี้ย (ไม่เคยโดนค่าปรับ)
@@ -351,8 +345,6 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         periodStart = new Date(periodEnd);
         periodEnd = new Date(periodStart);
         periodEnd.setDate(periodEnd.getDate() + 7);
-        // DEBUG LOG: reset รอบใหม่หลังจ่ายครบดอกเบี้ย
-        console.log('Reset period after full payment (no penalty). NewPeriodStart:', periodStart, 'NewPeriodEnd:', periodEnd);
         continue;
       }
       // ถ้าเลยวันนี้หรือไม่มี payment เพิ่มแล้ว ให้ break

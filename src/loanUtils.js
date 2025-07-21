@@ -106,6 +106,8 @@ export function calculateCurrentStatus(loan) {
         paidThisPeriod = true;
         // ถ้าจ่ายดอกเบี้ยครบในรอบนั้น (ไม่ว่าจะมีค่าปรับหรือไม่) ให้ reset ดอกเบี้ยค้างชำระ
         interestDue = 0;
+        // *** Fine-tune: หลังจ่ายครบค่าปรับ+ดอกเบี้ย continue ทันที เพื่อไม่ให้หักเงินต้นซ้ำ ***
+        break;
       }
     }
     // ถ้ายังมีดอกเบี้ยค้างชำระ จะคิดค่าปรับในรอบถัดไป

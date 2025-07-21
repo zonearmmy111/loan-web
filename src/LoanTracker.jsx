@@ -264,7 +264,17 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         penalty += periodPenalty;
         interestDue += periodInterest;
         hadPenalty = hadPenalty || (lateDays > 0);
-        break;
+        // *** ไม่ break ทันที ให้เช็คว่ามี payment หลังครบกำหนดหรือไม่ ***
+        // break เฉพาะกรณีที่ไม่มี payment หลังครบกำหนดเลย
+        // ถ้ายังมี payment ที่เหลือ (paymentIdx < payments.length) และ payment ถัดไปอยู่หลัง periodEnd ให้วน loop ต่อ
+        if (paymentIdx >= payments.length || payments[paymentIdx].date <= periodEnd) {
+          break;
+        }
+        // ถ้ามี payment หลังครบกำหนด ให้ขยับ periodStart/periodEnd ไปยังรอบถัดไป แล้ววน loop ต่อ
+        periodStart = new Date(periodEnd);
+        periodEnd = new Date(periodStart);
+        periodEnd.setDate(periodEnd.getDate() + 7);
+        continue;
       }
       // ถ้ามี payment ในรอบนี้
       let paidThisPeriod = false;

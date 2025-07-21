@@ -592,7 +592,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">ค่าปรับ</p>
-                          <p className="font-bold text-lg text-red-600">{formatCurrency(status.penalty)}</p>
+                          <p className="font-bold text-lg text-red-600">{formatCurrency(Math.max(status.penalty, status.penaltyPaidThisPeriod || 0))}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">ดอกเบี้ย+ค่าปรับที่ต้องจ่าย</p>

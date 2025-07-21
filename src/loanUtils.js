@@ -1,10 +1,10 @@
 // Utility function สำหรับคำนวณสถานะเงินกู้
-export function calculateCurrentStatus(loan) {
+export function calculateCurrentStatus(loan, currentDate) {
   const principal = loan.principal || 0;
   const interestRate = loan.interestRate ?? 0.2;
   const penaltyRate = loan.penaltyRate ?? 0.05;
   const startDate = new Date(loan.startDate);
-  const today = new Date();
+  const today = currentDate; // ใช้เวลาที่ส่งเข้ามา
   const payments = (loan.payments || []).map(p => ({ ...p, date: new Date(p.date) })).sort((a, b) => a.date - b.date);
 
   let currentPrincipal = principal;
@@ -106,7 +106,7 @@ export function calculateCurrentStatus(loan) {
         paidThisPeriod = true;
         // ถ้าจ่ายดอกเบี้ยครบในรอบนั้น (ไม่ว่าจะมีค่าปรับหรือไม่) ให้ reset ดอกเบี้ยค้างชำระ
         interestDue = 0;
-        // *** Fine-tune: หลังจ่ายครบค่าปรับ+ดอกเบี้ย continue ทันที เพื่อไม่ให้หักเงินต้นซ้ำ ***
+        // *** กลับไปใช้ break แทน continue เพื่อให้ logic เหมือนเดิม ***
         break;
       }
     }

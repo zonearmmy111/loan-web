@@ -44,6 +44,9 @@ const LoanTracker = ({ loans, refreshLoans }) => {
   const [editCustomer, setEditCustomer] = useState(null);
   const [editCustomerForm, setEditCustomerForm] = useState({ borrowerName: '', note: '', phone: '', paidInterest: false, hasCollateral: false });
 
+  // เพิ่ม state สำหรับ currentDate (เวลาที่แสดงด้านบน)
+  const [currentDate, setCurrentDate] = useState(new Date());
+
   // โหลดข้อมูล loans จาก Supabase
   useEffect(() => {
     const fetchLoans = async () => {
@@ -359,20 +362,20 @@ const LoanTracker = ({ loans, refreshLoans }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...loans]
               .filter(loan => {
-                const status = calculateCurrentStatus(loan);
+                const status = calculateCurrentStatus(loan, currentDate);
                 const isFullyPaid = status.currentPrincipal === 0 && status.interestDue === 0 && status.penalty === 0;
                 return activeTab === 'active' ? !isFullyPaid : isFullyPaid;
               })
               .sort((a, b) => {
-                const aStatus = calculateCurrentStatus(a);
-                const bStatus = calculateCurrentStatus(b);
+                const aStatus = calculateCurrentStatus(a, currentDate);
+                const bStatus = calculateCurrentStatus(b, currentDate);
                 // เลือกวันที่สำหรับเปรียบเทียบตาม paidInterest
                 const aKey = a.paidInterest ? aStatus.principalDueDate : aStatus.nextPaymentDue;
                 const bKey = b.paidInterest ? bStatus.principalDueDate : bStatus.nextPaymentDue;
                 return aKey - bKey;
               })
               .map(loan => {
-                const status = calculateCurrentStatus(loan);
+                const status = calculateCurrentStatus(loan, currentDate);
                 const isFullyPaid = status.currentPrincipal === 0 && status.interestDue === 0 && status.penalty === 0;
                 
                 return (
@@ -546,7 +549,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
               </div>
 
               {(() => {
-                const status = calculateCurrentStatus(selectedLoan);
+                const status = calculateCurrentStatus(selectedLoan, currentDate);
                 const isFullyPaid = status.currentPrincipal === 0 && status.interestDue === 0 && status.penalty === 0;
                 return (
                   <div className="space-y-6">
@@ -801,31 +804,31 @@ const LoanTracker = ({ loans, refreshLoans }) => {
               <h2 className="text-2xl font-bold mb-4 text-center">ใบแจ้งหนี้/บิล</h2>
               <div className="mb-2 flex justify-between">
                 <span className="font-medium">กำหนดชำระ:</span>
-                <span>{formatDate(calculateCurrentStatus(selectedLoan).nextPaymentDue.toISOString().split('T')[0])}</span>
+                <span>{formatDate(calculateCurrentStatus(selectedLoan, currentDate).nextPaymentDue.toISOString().split('T')[0])}</span>
               </div>
               <div className="mb-2 flex justify-between">
                 <span className="font-medium">เงินต้น:</span>
-                <span>{formatCurrency(calculateCurrentStatus(selectedLoan).currentPrincipal)}</span>
+                <span>{formatCurrency(calculateCurrentStatus(selectedLoan, currentDate).currentPrincipal)}</span>
               </div>
               <div className="mb-2 flex justify-between">
                 <span className="font-medium">{selectedLoan.hasCollateral === false ? 'ดอกเบี้ย 7 วันแรก:' : 'ดอกเบี้ย:'}</span>
-                <span>{formatCurrency(calculateCurrentStatus(selectedLoan).weeklyInterest)}{selectedLoan.paidInterest ? ' (หักดอกแล้ว)' : ''}</span>
+                <span>{formatCurrency(calculateCurrentStatus(selectedLoan, currentDate).weeklyInterest)}{selectedLoan.paidInterest ? ' (หักดอกแล้ว)' : ''}</span>
               </div>
               <div className="mb-2 flex justify-between">
                 <span className="font-medium">ค่าปรับ:</span>
-                <span>{formatCurrency(calculateCurrentStatus(selectedLoan).penalty)}</span>
+                <span>{formatCurrency(calculateCurrentStatus(selectedLoan, currentDate).penalty)}</span>
               </div>
               <div className="mb-2 flex justify-between border-t pt-2">
                 <span className="font-bold">รวม:</span>
                 <span className="font-bold text-pink-600">
                   {selectedLoan.paidInterest
-                    ? formatCurrency(calculateCurrentStatus(selectedLoan).currentPrincipal + calculateCurrentStatus(selectedLoan).penalty)
-                    : formatCurrency(calculateCurrentStatus(selectedLoan).currentPrincipal + calculateCurrentStatus(selectedLoan).weeklyInterest + calculateCurrentStatus(selectedLoan).penalty)
+                    ? formatCurrency(calculateCurrentStatus(selectedLoan, currentDate).currentPrincipal + calculateCurrentStatus(selectedLoan, currentDate).penalty)
+                    : formatCurrency(calculateCurrentStatus(selectedLoan, currentDate).currentPrincipal + calculateCurrentStatus(selectedLoan, currentDate).weeklyInterest + calculateCurrentStatus(selectedLoan, currentDate).penalty)
                   }
                 </span>
               </div>
               <div className="text-xs text-yellow-700 mt-2 mb-2 font-medium">
-                {`* หมายเหตุ: หากจ่ายเกินกำหนด จะคิดค่าปรับวันละ ${((calculateCurrentStatus(selectedLoan).penaltyRate || 0) * 100).toFixed(2).replace(/\.00$/, '')}% ของเงินต้นคงเหลือ`}
+                {`* หมายเหตุ: หากจ่ายเกินกำหนด จะคิดค่าปรับวันละ ${((calculateCurrentStatus(selectedLoan, currentDate).penaltyRate || 0) * 100).toFixed(2).replace(/\.00$/, '')}% ของเงินต้นคงเหลือ`}
               </div>
               <div className="mt-4 mb-2">
                 <div className="font-medium mb-1">ช่องทางการจ่ายเงิน:</div>

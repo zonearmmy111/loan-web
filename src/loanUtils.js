@@ -74,7 +74,12 @@ export function calculateCurrentStatus(loan, currentDate) {
       // ถ้าจ่ายหลัง periodEnd ให้คิดค่าปรับเฉพาะวันที่ยังไม่จ่ายดอกเบี้ย (คิดจากวันครบกำหนดถึงวันจ่ายจริงเท่านั้น)
       let lateDays = 0;
       if (payment.date > periodEnd) {
-        lateDays = Math.max(0, Math.floor((payment.date - periodEnd) / (1000 * 60 * 60 * 24)));
+        // Normalize เวลาเป็น 00:00:00 ทั้งสองฝั่ง
+        const due = new Date(periodEnd);
+        const paid = new Date(payment.date);
+        due.setHours(0,0,0,0);
+        paid.setHours(0,0,0,0);
+        lateDays = Math.max(0, Math.round((paid - due) / (1000 * 60 * 60 * 24)));
         if (lateDays > 0) {
           periodPenalty = currentPrincipal * penaltyRate * lateDays;
           let payPenalty = Math.min(paymentLeft, periodPenalty);
@@ -106,7 +111,8 @@ export function calculateCurrentStatus(loan, currentDate) {
         paidThisPeriod = true;
         // ถ้าจ่ายดอกเบี้ยครบในรอบนั้น (ไม่ว่าจะมีค่าปรับหรือไม่) ให้ reset ดอกเบี้ยค้างชำระ
         interestDue = 0;
-        // *** กลับไปใช้ break แทน continue เพื่อให้ logic เหมือนเดิม ***
+        // ถ้า paymentLeft > 0 ให้ continue เพื่อหักเงินต้นในรอบถัดไป
+        if (paymentLeft > 0) continue;
         break;
       }
     }
@@ -143,6 +149,12 @@ export function calculateCurrentStatus(loan, currentDate) {
   let totalDue = currentPrincipal + currentInterest;
   nextPaymentDue = periodEnd;
   principalDueDate = periodEnd;
+
+  // ถ้าเงินต้นหมด ให้ reset ดอกเบี้ย/ค่าปรับที่เหลือ
+  if (currentPrincipal === 0) {
+    interestDue = 0;
+    penalty = 0;
+  }
   // DEBUG LOG: สรุปผลลัพธ์
   // console.log('==== Loan Calculation Debug End ====');
   // console.log('Result:', {

@@ -255,10 +255,10 @@ const LoanTracker = ({ loans, refreshLoans }) => {
         periodPayments.push(payments[paymentIdx]);
         paymentIdx++;
       }
-      // ถ้าไม่มี payment ในรอบนี้ และเลย periodEnd ให้คิดค่าปรับ
+      // ถ้าไม่มี payment ในรอบนี้ และเลย periodEnd ให้คิดค่าปรับถึงวันนี้เท่านั้น
       if (periodPayments.length === 0 && today > periodEnd) {
-        let lateDays = Math.floor((today - periodEnd) / (1000 * 60 * 60 * 24));
-        isOverdue = true;
+        let lateDays = Math.max(0, Math.floor((today - periodEnd) / (1000 * 60 * 60 * 24)));
+        isOverdue = lateDays > 0;
         daysOverdue = lateDays;
         periodPenalty = currentPrincipal * penaltyRate * lateDays;
         penalty += periodPenalty;
@@ -271,9 +271,9 @@ const LoanTracker = ({ loans, refreshLoans }) => {
       for (const payment of periodPayments) {
         let paymentLeft = payment.amount;
         totalPaid += payment.amount;
-        // ถ้าจ่ายหลัง periodEnd ให้คิดค่าปรับเฉพาะวันที่ยังไม่จ่ายดอกเบี้ย
+        // ถ้าจ่ายหลัง periodEnd ให้คิดค่าปรับเฉพาะวันที่ยังไม่จ่ายดอกเบี้ย (คิดจากวันครบกำหนดถึงวันจ่ายจริงเท่านั้น)
         if (payment.date > periodEnd) {
-          let lateDays = Math.floor((payment.date - periodEnd) / (1000 * 60 * 60 * 24));
+          let lateDays = Math.max(0, Math.floor((payment.date - periodEnd) / (1000 * 60 * 60 * 24)));
           if (lateDays > 0) {
             periodPenalty = currentPrincipal * penaltyRate * lateDays;
             let payPenalty = Math.min(paymentLeft, periodPenalty);
@@ -282,6 +282,9 @@ const LoanTracker = ({ loans, refreshLoans }) => {
             paymentLeft -= payPenalty;
             penalty += periodPenalty - payPenalty;
             hadPenalty = true;
+            // ปรับปรุงให้ daysOverdue แสดงจำนวนวันที่จ่ายช้า (ถ้าเป็นรอบล่าสุด)
+            daysOverdue = lateDays;
+            isOverdue = true;
           }
         }
         // หักดอกเบี้ย
@@ -458,7 +461,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                         onChange={e => setNewLoan({ ...newLoan, hasCollateral: e.target.checked })}
                         className="form-checkbox h-5 w-5 text-blue-600"
                       />
-                      <span className="ml-2 text-sm text-gray-700">มีของค้ำประกัน</span>
+                      <span className="ml-2 text-sm text-blue-700 font-bold">ต่อดอก</span>
                     </label>
                   </div>
                   
@@ -914,7 +917,7 @@ const LoanTracker = ({ loans, refreshLoans }) => {
                       onChange={e => setEditCustomerForm({ ...editCustomerForm, hasCollateral: e.target.checked })}
                       className="form-checkbox h-5 w-5 text-blue-600"
                     />
-                    <span className="ml-2 text-sm text-gray-700">มีของค้ำประกัน</span>
+                    <span className="ml-2 text-sm text-blue-700 font-bold">ต่อดอก</span>
                   </label>
                 </div>
                 <div className="flex gap-3 pt-4">

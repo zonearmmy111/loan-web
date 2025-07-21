@@ -213,23 +213,132 @@ const LoanTracker = ({ loans, refreshLoans }) => {
 
   // เพิ่มฟังก์ชันนี้ไว้ก่อน return
   const calculateCurrentStatus = (loan) => {
+    // ใช้ข้อมูลจริงจาก loan
+    const principal = loan.principal || 0;
+    const interestRate = loan.interestRate ?? 0.2;
+    const penaltyRate = loan.penaltyRate ?? 0.05;
+    const startDate = new Date(loan.startDate);
+    const today = new Date();
+    const payments = (loan.payments || []).map(p => ({ ...p, date: new Date(p.date) })).sort((a, b) => a.date - b.date);
+
+    // รอบดอกเบี้ย (7 วัน)
+    let periodStart = new Date(startDate);
+    let periodEnd = new Date(periodStart);
+    periodEnd.setDate(periodEnd.getDate() + 7);
+    let currentPrincipal = principal;
+    let interestDue = 0;
+    let interestPaid = 0;
+    let penalty = 0;
+    let penaltyPaid = 0;
+    let totalPaid = 0;
+    let interestThisPeriod = currentPrincipal * interestRate;
+    let interestPaidThisPeriod = 0;
+    let penaltyThisPeriod = 0;
+    let penaltyPaidThisPeriod = 0;
+    let paymentIdx = 0;
+    let nextPaymentDue = new Date(periodEnd);
+    let principalDueDate = new Date(periodEnd);
+    let lastInterestPaymentDate = null;
+    let isOverdue = false;
+    let daysOverdue = 0;
+    let paidAllInterest = false;
+
+    // วนทีละรอบ 7 วัน
+    while (periodEnd <= today) {
+      // คำนวณค่าปรับถ้าผิดนัด
+      let periodPenalty = 0;
+      let periodInterest = currentPrincipal * interestRate;
+      let periodInterestDue = periodInterest;
+      let periodInterestPaid = 0;
+      let periodPenaltyPaid = 0;
+      let periodPaid = 0;
+      let periodPayments = [];
+      // รวบรวม payment ที่อยู่ในรอบนี้ (หรือหลังครบกำหนดแต่ยังไม่จ่ายครบ)
+      while (paymentIdx < payments.length && payments[paymentIdx].date <= periodEnd) {
+        periodPayments.push(payments[paymentIdx]);
+        paymentIdx++;
+      }
+      // ถ้าไม่มี payment ในรอบนี้ และเลย periodEnd ให้คิดค่าปรับ
+      if (periodPayments.length === 0 && today > periodEnd) {
+        // คิดค่าปรับสะสมจนกว่าจะจ่ายดอกเบี้ยครบ
+        let lateDays = Math.floor((today - periodEnd) / (1000 * 60 * 60 * 24));
+        isOverdue = true;
+        daysOverdue = lateDays;
+        periodPenalty = currentPrincipal * penaltyRate * lateDays;
+        penalty += periodPenalty;
+        interestDue += periodInterest;
+        break; // ยังไม่จ่ายดอกเบี้ยรอบนี้ จะคิดค่าปรับต่อเนื่อง
+      }
+      // ถ้ามี payment ในรอบนี้
+      for (const payment of periodPayments) {
+        let paymentLeft = payment.amount;
+        totalPaid += payment.amount;
+        // ถ้าจ่ายหลัง periodEnd ให้คิดค่าปรับเฉพาะวันที่ยังไม่จ่ายดอกเบี้ย
+        if (payment.date > periodEnd) {
+          let lateDays = Math.floor((payment.date - periodEnd) / (1000 * 60 * 60 * 24));
+          if (lateDays > 0) {
+            periodPenalty = currentPrincipal * penaltyRate * lateDays;
+            let payPenalty = Math.min(paymentLeft, periodPenalty);
+            penaltyPaidThisPeriod += payPenalty;
+            penaltyPaid += payPenalty;
+            paymentLeft -= payPenalty;
+            penalty += periodPenalty - payPenalty;
+          }
+        }
+        // หักดอกเบี้ย
+        let payInterest = Math.min(paymentLeft, periodInterestDue);
+        periodInterestPaid += payInterest;
+        interestPaid += payInterest;
+        paymentLeft -= payInterest;
+        periodInterestDue -= payInterest;
+        // หักเงินต้น
+        if (paymentLeft > 0) {
+          let payPrincipal = Math.min(paymentLeft, currentPrincipal);
+          currentPrincipal -= payPrincipal;
+          paymentLeft -= payPrincipal;
+        }
+        if (periodInterestDue === 0) {
+          paidAllInterest = true;
+          lastInterestPaymentDate = payment.date;
+        }
+      }
+      // ถ้ายังมีดอกเบี้ยค้างชำระ จะคิดค่าปรับในรอบถัดไป
+      if (periodInterestDue > 0) {
+        interestDue += periodInterestDue;
+        isOverdue = true;
+        // ไม่ break เพื่อให้วนรอบถัดไปคิดค่าปรับต่อเนื่อง
+      }
+      // เตรียมรอบถัดไป
+      periodStart = new Date(periodEnd);
+      periodEnd = new Date(periodStart);
+      periodEnd.setDate(periodEnd.getDate() + 7);
+      interestThisPeriod = currentPrincipal * interestRate;
+      penaltyThisPeriod = 0;
+      interestPaidThisPeriod = 0;
+      penaltyPaidThisPeriod = 0;
+      nextPaymentDue = new Date(periodEnd);
+      principalDueDate = new Date(periodEnd);
+    }
+    // ดอกเบี้ยรอบนี้ (รอบที่ยังไม่ถึงกำหนด)
+    let currentInterest = currentPrincipal * interestRate;
+    // รวมต้องจ่าย = เงินต้นคงเหลือ + ดอกเบี้ยรอบนี้
+    let totalDue = currentPrincipal + currentInterest;
     return {
-      currentPrincipal: 1000,
-      weeklyInterest: 200,
-      interestDue: 200,
-      interestPaidThisWeek: 400,
-      penalty: 0,
-      totalDue: 1200,
-      // mock ค่าอื่น ๆ ที่อาจถูกใช้ใน UI
-      penaltyPaidThisWeek: 0,
-      totalPaid: 0,
-      nextPaymentDue: new Date(),
-      principalDueDate: new Date(),
-      isOverdue: false,
-      daysOverdue: 0,
-      lastInterestPaymentDate: null,
-      interestRate: 0.2,
-      penaltyRate: 0.05
+      currentPrincipal,
+      weeklyInterest: currentInterest,
+      interestDue,
+      interestPaidThisWeek: interestPaid,
+      penalty,
+      totalDue,
+      penaltyPaidThisPeriod,
+      totalPaid,
+      nextPaymentDue,
+      principalDueDate,
+      isOverdue,
+      daysOverdue,
+      lastInterestPaymentDate,
+      interestRate,
+      penaltyRate
     };
   };
 
